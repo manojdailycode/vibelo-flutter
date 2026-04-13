@@ -191,6 +191,3 @@ All music comes from **Jamendo** — Creative Commons licensed.
 
 ---
 
-## QUESTIONS?
-
-If you get any error, share the exact error message and I will fix it for you!

@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 import '../providers/music_provider.dart';
 import '../widgets/song_tile.dart';
+import '../services/playlist_service.dart';
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
@@ -16,11 +17,26 @@ class LibraryScreen extends StatefulWidget {
 class _LibraryScreenState extends State<LibraryScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tab;
+  final _playlistService = PlaylistService();
+  List<Map<String, dynamic>> _playlists = [];
+  bool _loadingPlaylists = false;
 
   @override
   void initState() {
     super.initState();
     _tab = TabController(length: 3, vsync: this);
+    _loadPlaylists();
+  }
+
+  Future<void> _loadPlaylists() async {
+    final auth = context.read<AuthProvider>();
+    if (auth.isGuest || auth.user == null) return;
+    setState(() => _loadingPlaylists = true);
+    final list = await _playlistService.getPlaylists(auth.user!.uid);
+    setState(() {
+      _playlists = list;
+      _loadingPlaylists = false;
+    });
   }
 
   @override
@@ -36,22 +52,18 @@ class _LibraryScreenState extends State<LibraryScreen>
       body: SafeArea(
         child: Column(
           children: [
-            // Header
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Your Library',
-                    style: GoogleFonts.poppins(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                      color: VColors.textPri,
-                    ),
-                  ),
+                  Text('Your Library',
+                      style: GoogleFonts.poppins(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: VColors.textPri)),
                   IconButton(
-                    onPressed: _createPlaylist,
+                    onPressed: _showCreatePlaylistDialog,
                     icon: Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
@@ -65,8 +77,6 @@ class _LibraryScreenState extends State<LibraryScreen>
                 ],
               ),
             ),
-
-            // Tabs
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 20),
               height: 40,
@@ -78,14 +88,13 @@ class _LibraryScreenState extends State<LibraryScreen>
                 controller: _tab,
                 indicator: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [VColors.primary, Color(0xFF4A90D9)],
-                  ),
+                      colors: [VColors.primary, Color(0xFF4A90D9)]),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 indicatorSize: TabBarIndicatorSize.tab,
                 dividerColor: Colors.transparent,
-                labelStyle: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w600, fontSize: 13),
+                labelStyle:
+                    GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 13),
                 unselectedLabelStyle: GoogleFonts.poppins(fontSize: 13),
                 labelColor: Colors.white,
                 unselectedLabelColor: VColors.textSec,
@@ -97,13 +106,21 @@ class _LibraryScreenState extends State<LibraryScreen>
               ),
             ),
             const SizedBox(height: 16),
-
             Expanded(
               child: TabBarView(
                 controller: _tab,
                 children: [
                   _LikedTab(),
-                  _PlaylistsTab(),
+                  _PlaylistsTab(
+                    playlists: _playlists,
+                    loading: _loadingPlaylists,
+                    onDelete: (id) async {
+                      final auth = context.read<AuthProvider>();
+                      if (auth.user == null) return;
+                      await _playlistService.deletePlaylist(auth.user!.uid, id);
+                      _loadPlaylists();
+                    },
+                  ),
                   _RecentTab(),
                 ],
               ),
@@ -114,40 +131,106 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 
-  void _createPlaylist() {
+  void _showCreatePlaylistDialog() {
+    final auth = context.read<AuthProvider>();
+    if (auth.isGuest) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Sign in to create playlists',
+              style: GoogleFonts.poppins()),
+          backgroundColor: VColors.primary,
+        ),
+      );
+      return;
+    }
+
+    final nameCtrl = TextEditingController();
+    String selectedEmoji = '🎵';
+    final emojis = ['🎵', '🎸', '💜', '🌅', '💪', '🌙', '🎯', '🎉', '😌', '⚡'];
+
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: VColors.surface,
-        title: Text('New Playlist',
-            style: GoogleFonts.poppins(color: VColors.textPri)),
-        content: TextField(
-          style: GoogleFonts.poppins(color: VColors.textPri),
-          decoration: const InputDecoration(hintText: 'Playlist name'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          backgroundColor: VColors.surface,
+          title: Text('New Playlist',
+              style: GoogleFonts.poppins(
+                  color: VColors.textPri, fontWeight: FontWeight.w600)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Emoji picker
+              SizedBox(
+                height: 50,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: emojis.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (_, i) => GestureDetector(
+                    onTap: () => setS(() => selectedEmoji = emojis[i]),
+                    child: Container(
+                      width: 40, height: 40,
+                      decoration: BoxDecoration(
+                        color: selectedEmoji == emojis[i]
+                            ? VColors.primary.withValues(alpha: 0.3)
+                            : VColors.card,
+                        borderRadius: BorderRadius.circular(10),
+                        border: selectedEmoji == emojis[i]
+                            ? Border.all(color: VColors.primary)
+                            : null,
+                      ),
+                      child: Center(
+                        child: Text(emojis[i],
+                            style: const TextStyle(fontSize: 20)),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: nameCtrl,
+                style: GoogleFonts.poppins(color: VColors.textPri),
+                autofocus: true,
+                decoration: const InputDecoration(
+                    hintText: 'Playlist name'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel',
+                  style: GoogleFonts.poppins(color: VColors.textSec)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (nameCtrl.text.trim().isEmpty) return;
+                final uid = auth.user!.uid;
+                await _playlistService.createPlaylist(
+                  userId: uid,
+                  name: nameCtrl.text.trim(),
+                  emoji: selectedEmoji,
+                );
+                if (ctx.mounted) Navigator.pop(ctx);
+                _loadPlaylists();
+              },
+              child: Text('Create',
+                  style: GoogleFonts.poppins(color: Colors.white)),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel',
-                style: GoogleFonts.poppins(color: VColors.textSec)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            child:
-                Text('Create', style: GoogleFonts.poppins(color: Colors.white)),
-          ),
-        ],
       ),
     );
   }
 }
 
+// ─── Liked Tab ────────────────────────────────
 class _LikedTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final music = context.watch<MusicProvider>();
-
     final liked = music.trending.where((s) => auth.isLiked(s.id)).toList();
 
     if (auth.isGuest) {
@@ -157,7 +240,6 @@ class _LikedTab extends StatelessWidget {
         subtitle: 'Create an account to save your favorites',
       );
     }
-
     if (liked.isEmpty) {
       return const _EmptyState(
         icon: Icons.favorite_border_rounded,
@@ -165,7 +247,6 @@ class _LikedTab extends StatelessWidget {
         subtitle: 'Tap the heart on any song to save it here',
       );
     }
-
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       itemCount: liked.length,
@@ -174,27 +255,30 @@ class _LikedTab extends StatelessWidget {
   }
 }
 
+// ─── Playlists Tab ────────────────────────────
 class _PlaylistsTab extends StatelessWidget {
-  final _samplePlaylists = const [
-    {'name': 'Morning Vibes', 'count': 12, 'emoji': '🌅'},
-    {'name': 'Workout Mix', 'count': 18, 'emoji': '💪'},
-    {'name': 'Late Night', 'count': 9, 'emoji': '🌙'},
-    {'name': 'Focus Mode', 'count': 15, 'emoji': '🎯'},
-  ];
+  final List<Map<String, dynamic>> playlists;
+  final bool loading;
+  final void Function(String id) onDelete;
+
+  const _PlaylistsTab({
+    required this.playlists,
+    required this.loading,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       children: [
-        // Offline downloads card (Premium)
+        // Downloads premium card
         Container(
           margin: const EdgeInsets.only(bottom: 16),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0xFFFFD700), Color(0xFFFF8C00)],
-            ),
+                colors: [Color(0xFFFFD700), Color(0xFFFF8C00)]),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
@@ -209,7 +293,7 @@ class _PlaylistsTab extends StatelessWidget {
                     Text('Downloads',
                         style: GoogleFonts.poppins(
                             fontWeight: FontWeight.w700, color: Colors.white)),
-                    Text('Premium feature — offline listening',
+                    Text('Premium — offline listening',
                         style: GoogleFonts.poppins(
                             fontSize: 12, color: Colors.white70)),
                   ],
@@ -221,8 +305,27 @@ class _PlaylistsTab extends StatelessWidget {
           ),
         ),
 
-        // Playlists
-        ..._samplePlaylists.map((p) => _PlaylistCard(playlist: p)),
+        if (loading)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(color: VColors.primary),
+            ),
+          )
+        else if (playlists.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 32),
+            child: _EmptyState(
+              icon: Icons.playlist_add_rounded,
+              title: 'No playlists yet',
+              subtitle: 'Tap + to create your first playlist',
+            ),
+          )
+        else
+          ...playlists.map((p) => _PlaylistCard(
+                playlist: p,
+                onDelete: () => onDelete(p['id'] as String),
+              )),
       ],
     );
   }
@@ -230,10 +333,14 @@ class _PlaylistsTab extends StatelessWidget {
 
 class _PlaylistCard extends StatelessWidget {
   final Map<String, dynamic> playlist;
-  const _PlaylistCard({required this.playlist});
+  final VoidCallback onDelete;
+
+  const _PlaylistCard({required this.playlist, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
+    final songs =
+        (playlist['songs'] as List?)?.length ?? 0;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
@@ -245,15 +352,16 @@ class _PlaylistCard extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 52,
-            height: 52,
+            width: 52, height: 52,
             decoration: BoxDecoration(
               gradient: VColors.primaryGrad,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Center(
-              child: Text(playlist['emoji'] as String,
-                  style: const TextStyle(fontSize: 24)),
+              child: Text(
+                playlist['emoji'] ?? '🎵',
+                style: const TextStyle(fontSize: 24),
+              ),
             ),
           ),
           const SizedBox(width: 14),
@@ -261,34 +369,50 @@ class _PlaylistCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  playlist['name'] as String,
-                  style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w600,
-                      color: VColors.textPri,
-                      fontSize: 15),
-                ),
-                Text(
-                  '${playlist['count']} songs',
-                  style:
-                      GoogleFonts.poppins(fontSize: 12, color: VColors.textSec),
-                ),
+                Text(playlist['name'] ?? 'Playlist',
+                    style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w600,
+                        color: VColors.textPri,
+                        fontSize: 15)),
+                Text('$songs songs',
+                    style: GoogleFonts.poppins(
+                        fontSize: 12, color: VColors.textSec)),
               ],
             ),
           ),
-          const Icon(Icons.more_vert_rounded, color: VColors.textSec),
+          PopupMenuButton<String>(
+            color: VColors.surface,
+            icon: const Icon(Icons.more_vert_rounded, color: VColors.textSec),
+            onSelected: (v) {
+              if (v == 'delete') onDelete();
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    const Icon(Icons.delete_outline_rounded,
+                        color: VColors.error, size: 18),
+                    const SizedBox(width: 8),
+                    Text('Delete',
+                        style: GoogleFonts.poppins(color: VColors.error)),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
+// ─── Recent Tab ───────────────────────────────
 class _RecentTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final music = context.watch<MusicProvider>();
     final recent = music.trending.take(10).toList();
-
     if (recent.isEmpty) {
       return const _EmptyState(
         icon: Icons.history_rounded,
@@ -296,7 +420,6 @@ class _RecentTab extends StatelessWidget {
         subtitle: 'Songs you play will appear here',
       );
     }
-
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       itemCount: recent.length,
@@ -305,6 +428,7 @@ class _RecentTab extends StatelessWidget {
   }
 }
 
+// ─── Empty State ──────────────────────────────
 class _EmptyState extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -330,9 +454,13 @@ class _EmptyState extends StatelessWidget {
                   fontSize: 16,
                   fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
-          Text(subtitle,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(color: VColors.textSec, fontSize: 13)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(subtitle,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                    color: VColors.textSec, fontSize: 13)),
+          ),
         ],
       ),
     );

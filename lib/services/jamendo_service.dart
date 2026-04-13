@@ -8,7 +8,7 @@ import '../models/song_model.dart';
 //  Replace YOUR_CLIENT_ID below with your Client ID
 // ─────────────────────────────────────────────────────
 class JamendoService {
-  static const String _clientId = 'YOUR_CLIENT_ID'; // ← Replace this
+  static const String _clientId = '9649d556'; // ← Replace this
   static const String _base = 'https://api.jamendo.com/v3.0';
 
   // ── Trending / Featured Songs ────────────────────
