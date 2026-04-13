@@ -1,4 +1,4 @@
-# vibelo
+# vibelo-music-flutter-app
 
 A new Flutter project.
 
