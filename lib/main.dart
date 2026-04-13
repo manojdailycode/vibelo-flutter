@@ -31,19 +31,30 @@ Future<void> main() async {
     ),
   );
 
-  // Firebase — add google-services.json first (see SETUP.md)
-  await Firebase.initializeApp();
+  // Firebase init — wrapped so app doesn't crash if google-services.json is missing
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint('Firebase init failed: $e');
+    debugPrint('Add google-services.json to android/app/ to fix this');
+  }
 
-  // Background audio
-  audioHandler = await AudioService.init(
-    builder: () => VibeleAudioHandler(),
-    config: const AudioServiceConfig(
-      androidNotificationChannelId: 'com.vibelo.app.audio',
-      androidNotificationChannelName: 'Vibelo Music',
-      androidNotificationOngoing: true,
-      androidStopForegroundOnPause: true,
-    ),
-  );
+  // Background audio — wrapped to prevent crashes
+  try {
+    audioHandler = await AudioService.init(
+      builder: () => VibeleAudioHandler(),
+      config: const AudioServiceConfig(
+        androidNotificationChannelId: 'com.vibelo.app.audio',
+        androidNotificationChannelName: 'Vibelo Music',
+        androidNotificationOngoing: true,
+        androidStopForegroundOnPause: true,
+      ),
+    );
+  } catch (e) {
+    debugPrint('AudioService init failed: $e');
+    debugPrint('Audio service will run in fallback mode');
+    audioHandler = VibeleAudioHandler();
+  }
 
   runApp(VibeleApp(handler: audioHandler));
 }
