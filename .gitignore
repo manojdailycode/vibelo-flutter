@@ -1,0 +1,24 @@
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+*.lock
+
+# Android
+android/.gradle/
+android/local.properties
+android/key.properties
+
+# Firebase — IMPORTANT: never upload this
+android/app/google-services.json
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
