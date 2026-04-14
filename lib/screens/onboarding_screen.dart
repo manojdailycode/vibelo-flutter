@@ -47,22 +47,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              // Skip button
-              Align(
-                alignment: Alignment.topRight,
-                child: TextButton(
-                  onPressed: _finish,
-                  child: Text(
-                    'Skip',
-                    style: GoogleFonts.poppins(
-                      color: VColors.textSec,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              ),
+              // No skip button — users must go through all 3 pages
+              const SizedBox(height: 16),
 
-              // Pages
               Expanded(
                 child: PageView.builder(
                   controller: _ctrl,
@@ -72,12 +59,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
               ),
 
-              // Dots + Button
               Padding(
                 padding: const EdgeInsets.fromLTRB(32, 0, 32, 40),
                 child: Column(
                   children: [
-                    // Dots
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: List.generate(
@@ -88,16 +73,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           width: i == _page ? 24 : 8,
                           height: 8,
                           decoration: BoxDecoration(
-                            color:
-                                i == _page ? VColors.primary : VColors.divider,
+                            color: i == _page
+                                ? VColors.primary
+                                : VColors.divider,
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),
                       ),
                     ),
                     const SizedBox(height: 32),
-
-                    // Button
                     SizedBox(
                       width: double.infinity,
                       height: 54,
@@ -175,7 +159,6 @@ class _OnboardPage extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Icon circle
           Container(
             width: 160,
             height: 160,

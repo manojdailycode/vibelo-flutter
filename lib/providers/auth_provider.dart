@@ -112,6 +112,12 @@ class AuthProvider extends ChangeNotifier {
 
   bool isLiked(String songId) => _user?.likedSongIds.contains(songId) ?? false;
 
+  // ── FIX: Allow profile screen to push local updates immediately ──────────
+  void updateUserLocally(UserModel updated) {
+    _user = updated;
+    notifyListeners();
+  }
+
   void _setLoading(bool v) { _loading = v; notifyListeners(); }
   void _setError(String msg) { _error = msg; notifyListeners(); }
   void _clearError() { _error = null; }

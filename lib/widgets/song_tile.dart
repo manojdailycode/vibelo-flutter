@@ -18,13 +18,19 @@ class SongTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final player = context.watch<PlayerProvider>();
-    final auth = context.watch<AuthProvider>();
-    final isPlaying = player.currentSong?.id == song.id && player.isPlaying;
-    final isLiked = auth.isLiked(song.id);
+    // ✓ Optimized: Use Selector to listen only to specific fields
+    // This prevents rebuilds when other provider data changes
+    final isPlaying = context.select<PlayerProvider, bool>(
+      (provider) => provider.currentSong?.id == song.id && provider.isPlaying,
+    );
+    
+    final isLiked = context.select<AuthProvider, bool>(
+      (provider) => provider.isLiked(song.id),
+    );
 
     return GestureDetector(
       onTap: () {
+        final player = context.read<PlayerProvider>();
         player.playSong(song, queue: songs);
         showModalBottomSheet(
           context: context,
@@ -110,7 +116,10 @@ class SongTile extends StatelessWidget {
 
             // Like
             IconButton(
-              onPressed: () => auth.toggleLike(song.id),
+              onPressed: () {
+                final auth = context.read<AuthProvider>();
+                auth.toggleLike(song.id);
+              },
               icon: Icon(
                 isLiked
                     ? Icons.favorite_rounded

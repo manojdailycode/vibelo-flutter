@@ -33,14 +33,25 @@ class PlaylistService {
   }
 
   // ── Get user playlists ───────────────────────────
-  Future<List<Map<String, dynamic>>> getPlaylists(String userId) async {
+  Future<List<Map<String, dynamic>>> getPlaylists(
+    String userId, {
+    int limit = 20,
+    DocumentSnapshot? startAfter,
+  }) async {
     try {
-      final snap = await _db
+      // ✓ Optimized: Added pagination to handle 100+ playlists
+      var query = _db
           .collection('users')
           .doc(userId)
           .collection('playlists')
           .orderBy('createdAt', descending: true)
-          .get();
+          .limit(limit);
+      
+      if (startAfter != null) {
+        query = query.startAfterDocument(startAfter);
+      }
+      
+      final snap = await query.get();
       return snap.docs.map((d) => d.data()).toList();
     } catch (e) {
       return [];
@@ -60,24 +71,21 @@ class PlaylistService {
           .collection('playlists')
           .doc(playlistId);
 
-      // Store minimal song data
-      final existing = await ref.get();
-      final songs =
-          List<Map<String, dynamic>>.from(existing.data()?['songs'] ?? []);
-
-      // Avoid duplicates
-      if (songs.any((s) => s['id'] == song.id)) return true;
-
-      songs.add({
+      // ✓ Optimized: Use atomic arrayUnion instead of fetch-modify-write
+      // This is a single Firestore write (not two), prevents race conditions
+      final songData = {
         'id': song.id,
         'title': song.title,
         'artist': song.artist,
         'audioUrl': song.audioUrl,
         'imageUrl': song.imageUrl,
         'duration': song.duration,
-      });
+      };
 
-      await ref.update({'songs': songs});
+      await ref.update({
+        'songs': FieldValue.arrayUnion([songData])
+      });
+      
       return true;
     } catch (e) {
       return false;

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../theme/app_theme.dart';
-import '../providers/auth_provider.dart';
 import 'onboarding_screen.dart';
 import 'main_screen.dart';
+import 'auth/login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -53,30 +53,37 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _startAnimation() async {
-    await Future.delayed(const Duration(milliseconds: 200));
+    await Future.delayed(const Duration(milliseconds: 100));
+    if (!mounted) return;
     _logoCtrl.forward();
-    await Future.delayed(const Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
     _textCtrl.forward();
-    await Future.delayed(const Duration(milliseconds: 1200));
-    _navigate();
+    // Reduced delay for faster navigation (was 1200ms, now 800ms)
+    await Future.delayed(const Duration(milliseconds: 800));
+    if (!mounted) return;
+    await _navigate();
   }
 
   Future<void> _navigate() async {
     if (!mounted) return;
 
-    // Check if onboarding was completed
     final prefs = await SharedPreferences.getInstance();
     final onboardingDone = prefs.getBool('onboarding_done') ?? false;
 
     if (!mounted) return;
 
-    final auth = context.read<AuthProvider>();
-    if (auth.isLoggedIn) {
-      _goto(const MainScreen());
+    // ✅ FIX: Use FirebaseAuth directly (synchronous, always up-to-date)
+    // Don't rely on AuthProvider stream which may not have fired yet
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    final isLoggedIn = firebaseUser != null;
+
+    if (isLoggedIn) {
+      _goto(const MainScreen());        // Already logged in → skip everything
     } else if (onboardingDone) {
-      _goto(const OnboardingScreen());
+      _goto(const LoginScreen());       // Saw onboarding → go to Login
     } else {
-      _goto(const OnboardingScreen());
+      _goto(const OnboardingScreen()); // First install → show onboarding
     }
   }
 
@@ -108,7 +115,6 @@ class _SplashScreenState extends State<SplashScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Animated Logo
               AnimatedBuilder(
                 animation: _logoCtrl,
                 builder: (_, __) => Opacity(
@@ -120,8 +126,6 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
               ),
               const SizedBox(height: 24),
-
-              // Animated App Name
               AnimatedBuilder(
                 animation: _textCtrl,
                 builder: (_, __) => SlideTransition(
@@ -160,7 +164,6 @@ class _SplashScreenState extends State<SplashScreen>
   }
 }
 
-// Original Vibelo logo — drawn with Flutter, no external assets
 class _VibeleLogoPainter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {

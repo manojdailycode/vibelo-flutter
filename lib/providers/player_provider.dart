@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:audio_service/audio_service.dart';
+import 'package:just_audio/just_audio.dart';
 import '../services/audio_handler.dart';
 import '../models/song_model.dart';
 
@@ -13,7 +14,10 @@ class PlayerProvider extends ChangeNotifier {
   bool _isPlaying = false;
   bool _isShuffled = false;
   bool _isLooping = false;
-  bool _isLoading = false;
+
+  // FIX: separate "loading a new song" from "buffering"
+  bool _isLoadingSong = false; // true only while calling playSong()
+  bool _isBuffering = false;   // true while audio engine is buffering
 
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
@@ -27,12 +31,21 @@ class PlayerProvider extends ChangeNotifier {
       _isPlaying = v;
       notifyListeners();
     });
+
     _handler.positionStream.listen((d) {
       _position = d;
       notifyListeners();
     });
+
     _handler.durationStream.listen((d) {
       _duration = d ?? Duration.zero;
+      notifyListeners();
+    });
+
+    // FIX: track buffering state from the audio engine
+    _handler.player.processingStateStream.listen((state) {
+      _isBuffering = state == ProcessingState.loading ||
+          state == ProcessingState.buffering;
       notifyListeners();
     });
   }
@@ -43,7 +56,11 @@ class PlayerProvider extends ChangeNotifier {
   bool get isPlaying => _isPlaying;
   bool get isShuffled => _isShuffled;
   bool get isLooping => _isLooping;
-  bool get isLoading => _isLoading;
+
+  /// Show spinner only while loading a new song OR while buffering.
+  /// Once playing, both become false and the play/pause icon shows correctly.
+  bool get isLoading => _isLoadingSong || _isBuffering;
+
   bool get hasSong => _currentSong != null;
   Duration get position => _position;
   Duration get duration => _duration;
@@ -56,7 +73,7 @@ class PlayerProvider extends ChangeNotifier {
 
   // ── Play a song ──────────────────────────────────
   Future<void> playSong(SongModel song, {List<SongModel>? queue}) async {
-    _isLoading = true;
+    _isLoadingSong = true;
     notifyListeners();
 
     _currentSong = song;
@@ -77,9 +94,15 @@ class PlayerProvider extends ChangeNotifier {
       duration: Duration(seconds: song.duration),
     );
 
-    await _handler.playFromUrl(song.audioUrl, item);
-    _isLoading = false;
-    notifyListeners();
+    // FIX: always clear isLoadingSong in finally so spinner never gets stuck
+    try {
+      await _handler.playFromUrl(song.audioUrl, item);
+    } catch (e) {
+      debugPrint('PlayerProvider.playSong error: $e');
+    } finally {
+      _isLoadingSong = false;
+      notifyListeners();
+    }
   }
 
   Future<void> togglePlayPause() async {

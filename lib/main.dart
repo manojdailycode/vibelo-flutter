@@ -13,33 +13,17 @@ import 'screens/splash_screen.dart';
 
 late VibeleAudioHandler audioHandler;
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // Lock to portrait
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
-
-  // Transparent status bar
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: Color(0xFF070B14),
-    ),
-  );
-
-  // Firebase init — wrapped so app doesn't crash if google-services.json is missing
+/// Initializes all services in the background after UI loads
+Future<void> _initializeServices() async {
+  // Firebase initialization
   try {
     await Firebase.initializeApp();
+    debugPrint('✓ Firebase initialized');
   } catch (e) {
-    debugPrint('Firebase init failed: $e');
-    debugPrint('Add google-services.json to android/app/ to fix this');
+    debugPrint('✗ Firebase init failed: $e');
   }
 
-  // Background audio — wrapped to prevent crashes
+  // Audio service initialization
   try {
     audioHandler = await AudioService.init(
       builder: () => VibeleAudioHandler(),
@@ -50,18 +34,44 @@ Future<void> main() async {
         androidStopForegroundOnPause: true,
       ),
     );
+    debugPrint('✓ AudioService initialized');
   } catch (e) {
-    debugPrint('AudioService init failed: $e');
-    debugPrint('Audio service will run in fallback mode');
+    debugPrint('✗ AudioService init failed: $e');
     audioHandler = VibeleAudioHandler();
   }
+}
 
-  runApp(VibeleApp(handler: audioHandler));
+Future<void> main() async {
+  // Only initialize UI bindings — this is lightning fast
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Lock orientation — very fast
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
+  // Transparent status bar — very fast
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: Color(0xFF070B14),
+    ),
+  );
+
+  // Initialize a dummy audio handler for instant UI load
+  audioHandler = VibeleAudioHandler();
+
+  // Run app immediately — no blocking!
+  runApp(const VibeleApp());
+
+  // Initialize services in the background (app already showing)
+  await _initializeServices();
 }
 
 class VibeleApp extends StatelessWidget {
-  final VibeleAudioHandler handler;
-  const VibeleApp({super.key, required this.handler});
+  const VibeleApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -69,7 +79,7 @@ class VibeleApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => MusicProvider()),
-        ChangeNotifierProvider(create: (_) => PlayerProvider(handler)),
+        ChangeNotifierProvider(create: (_) => PlayerProvider(audioHandler)),
       ],
       child: MaterialApp(
         title: 'Vibelo',

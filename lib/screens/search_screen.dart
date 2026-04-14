@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:async';
 import '../theme/app_theme.dart';
 import '../providers/music_provider.dart';
 import '../widgets/song_tile.dart';
@@ -15,15 +16,27 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final _ctrl = TextEditingController();
+  Timer? _debounce;
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _ctrl.dispose();
     super.dispose();
   }
 
   void _search(String q) {
     context.read<MusicProvider>().search(q);
+  }
+
+  void _onSearchChanged(String value) {
+    // ✓ Optimized: Debounce search input for 300ms
+    // This prevents excessive API calls while user is typing
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      _search(value);
+    });
+    setState(() {});
   }
 
   @override
@@ -70,10 +83,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         )
                       : null,
                 ),
-                onChanged: (v) {
-                  _search(v);
-                  setState(() {});
-                },
+                onChanged: _onSearchChanged,
               ),
               const SizedBox(height: 20),
 

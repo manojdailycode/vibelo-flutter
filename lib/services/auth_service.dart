@@ -8,6 +8,11 @@ class AuthService {
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
+  // ✓ Optimization: Simple in-memory user cache with TTL
+  final Map<String, UserModel> _userCache = {};
+  final Map<String, DateTime> _userCacheTimes = {};
+  static const _cacheDuration = Duration(hours: 1);
+
   User? get currentUser => _auth.currentUser;
   Stream<User?> get authStateChanges => _auth.authStateChanges();
   bool get isGuest => _auth.currentUser?.isAnonymous ?? false;
@@ -62,15 +67,34 @@ class AuthService {
 
   // ── Sign Out ─────────────────────────────────────
   Future<void> signOut() async {
+    _userCache.clear();
+    _userCacheTimes.clear();
     await _googleSignIn.signOut();
     await _auth.signOut();
   }
 
   // ── Fetch User Data ──────────────────────────────
   Future<UserModel?> fetchUser(String uid) async {
+    // ✓ Optimized: Check cache first (valid for 1 hour)
+    if (_userCache.containsKey(uid)) {
+      final cacheTime = _userCacheTimes[uid];
+      if (cacheTime != null && 
+          DateTime.now().difference(cacheTime) < _cacheDuration) {
+        return _userCache[uid];
+      }
+    }
+    
+    // Cache miss or expired - fetch from Firestore
     final doc = await _db.collection('users').doc(uid).get();
     if (!doc.exists) return null;
-    return UserModel.fromMap(doc.data()!, uid);
+    
+    final user = UserModel.fromMap(doc.data()!, uid);
+    
+    // Update cache
+    _userCache[uid] = user;
+    _userCacheTimes[uid] = DateTime.now();
+    
+    return user;
   }
 
   // ── Update User ──────────────────────────────────

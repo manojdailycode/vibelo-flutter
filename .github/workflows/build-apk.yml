@@ -1,0 +1,83 @@
+name: Build & Release APK
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2. Setup Java (required for Android build)
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      # 3. Setup Flutter
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.0'
+          channel: 'stable'
+
+      # 4. Install dependencies
+      - name: Install Dependencies
+        run: flutter pub get
+
+      # 5. Get version from pubspec.yaml
+      - name: Get Version
+        id: version
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | cut -d'+' -f1 | tr -d ' ')
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      # 6. Build PURE APK (universal, no architecture splits)
+      - name: Build Release APK (Universal)
+        run: flutter build apk --release --no-split-per-abi
+
+      # 7. Rename APK with version
+      - name: Rename APK
+        run: |
+          mv build/app/outputs/flutter-apk/app-release.apk \
+             build/app/outputs/flutter-apk/Vibelo-v${{ env.VERSION }}.apk
+
+      # 8. Delete old release if exists (avoid conflicts)
+      - name: Delete Old Release
+        run: |
+          gh release delete "v${{ env.VERSION }}" --yes || true
+          git push --delete origin "v${{ env.VERSION }}" || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 9. Create Release & Upload APK
+      - name: Upload APK to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: Vibelo v${{ env.VERSION }}
+          body: |
+            ## 📦 Vibelo v${{ env.VERSION }} - Pure APK (Universal)
+            
+            **In-app purchase & payments system:** Razorpay integration (in development)
+            
+            ### Installation
+            1. Download **Vibelo-v${{ env.VERSION }}.apk** below
+            2. Enable "Install from unknown sources" in Android settings
+            3. Tap the APK file to install
+            
+            **Supported:** Android 5.0+ (API 21+)
+            
+            This is a **universal APK** — works on all architectures (arm64, x86, etc.)
+          files: build/app/outputs/flutter-apk/Vibelo-v${{ env.VERSION }}.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

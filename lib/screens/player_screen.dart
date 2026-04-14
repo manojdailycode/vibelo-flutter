@@ -64,7 +64,6 @@ class _PlayerScreenState extends State<PlayerScreen>
         ),
         child: Column(
           children: [
-            // Handle
             const SizedBox(height: 12),
             Container(
               width: 40,
@@ -75,7 +74,6 @@ class _PlayerScreenState extends State<PlayerScreen>
               ),
             ),
             const SizedBox(height: 16),
-
             Expanded(
               child: SingleChildScrollView(
                 controller: ctrl,
@@ -226,7 +224,6 @@ class _PlayerScreenState extends State<PlayerScreen>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        // Shuffle
                         IconButton(
                           onPressed: player.toggleShuffle,
                           icon: Icon(
@@ -237,7 +234,6 @@ class _PlayerScreenState extends State<PlayerScreen>
                             size: 24,
                           ),
                         ),
-                        // Previous
                         IconButton(
                           onPressed: player.skipPrevious,
                           icon: const Icon(
@@ -246,9 +242,9 @@ class _PlayerScreenState extends State<PlayerScreen>
                             size: 36,
                           ),
                         ),
-                        // Play / Pause
+                        // ── FIX: show loading ONLY during initial load/buffering ──
                         GestureDetector(
-                          onTap: player.togglePlayPause,
+                          onTap: player.isLoading ? null : player.togglePlayPause,
                           child: Container(
                             width: 68,
                             height: 68,
@@ -259,7 +255,8 @@ class _PlayerScreenState extends State<PlayerScreen>
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: VColors.primary.withValues(alpha: 0.5),
+                                  color:
+                                      VColors.primary.withValues(alpha: 0.5),
                                   blurRadius: 20,
                                   spreadRadius: 2,
                                 ),
@@ -269,7 +266,7 @@ class _PlayerScreenState extends State<PlayerScreen>
                                 ? const Padding(
                                     padding: EdgeInsets.all(20),
                                     child: CircularProgressIndicator(
-                                        color: Colors.white, strokeWidth: 2),
+                                        color: Colors.white, strokeWidth: 2.5),
                                   )
                                 : Icon(
                                     player.isPlaying
@@ -280,7 +277,6 @@ class _PlayerScreenState extends State<PlayerScreen>
                                   ),
                           ),
                         ),
-                        // Next
                         IconButton(
                           onPressed: player.skipNext,
                           icon: const Icon(
@@ -289,7 +285,6 @@ class _PlayerScreenState extends State<PlayerScreen>
                             size: 36,
                           ),
                         ),
-                        // Loop
                         IconButton(
                           onPressed: player.toggleLoop,
                           icon: Icon(
@@ -343,7 +338,8 @@ class _PlayerScreenState extends State<PlayerScreen>
                         color: VColors.secondary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                            color: VColors.secondary.withValues(alpha: 0.3)),
+                            color:
+                                VColors.secondary.withValues(alpha: 0.3)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -372,6 +368,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     );
   }
 
+  // ── FIX: Queue now shows album artwork on the left ──────────────────────
   void _showQueue(BuildContext context, PlayerProvider player) {
     showModalBottomSheet(
       context: context,
@@ -402,27 +399,57 @@ class _PlayerScreenState extends State<PlayerScreen>
                 final s = player.queue[i];
                 final isCurrent = i == player.queueIndex;
                 return ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: isCurrent ? VColors.primary : VColors.card,
-                    child: Icon(
-                      isCurrent
-                          ? Icons.volume_up_rounded
-                          : Icons.music_note_rounded,
-                      color: Colors.white,
-                      size: 18,
-                    ),
+                  // ── Album art instead of plain icon ──
+                  leading: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: s.imageUrl.isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: s.imageUrl,
+                                width: 46,
+                                height: 46,
+                                fit: BoxFit.cover,
+                                placeholder: (_, __) => _QueueArtPlaceholder(
+                                    active: isCurrent),
+                                errorWidget: (_, __, ___) =>
+                                    _QueueArtPlaceholder(active: isCurrent),
+                              )
+                            : _QueueArtPlaceholder(active: isCurrent),
+                      ),
+                      // Overlay playing indicator on top of art
+                      if (isCurrent)
+                        Container(
+                          width: 46,
+                          height: 46,
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.volume_up_rounded,
+                              color: VColors.primary, size: 20),
+                        ),
+                    ],
                   ),
-                  title: Text(s.title,
-                      maxLines: 1,
-                      style: GoogleFonts.poppins(
-                          color: isCurrent ? VColors.primary : VColors.textPri,
-                          fontWeight:
-                              isCurrent ? FontWeight.w600 : FontWeight.normal,
-                          fontSize: 14)),
-                  subtitle: Text(s.artist,
-                      maxLines: 1,
-                      style: GoogleFonts.poppins(
-                          color: VColors.textSec, fontSize: 12)),
+                  title: Text(
+                    s.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                        color: isCurrent ? VColors.primary : VColors.textPri,
+                        fontWeight: isCurrent
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                        fontSize: 14),
+                  ),
+                  subtitle: Text(
+                    s.artist,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                        color: VColors.textSec, fontSize: 12),
+                  ),
                   onTap: () {
                     player.playSong(s);
                     Navigator.pop(context);
@@ -460,6 +487,26 @@ class _PlayerScreenState extends State<PlayerScreen>
   }
 }
 
+// ── Queue art placeholder ────────────────────────
+class _QueueArtPlaceholder extends StatelessWidget {
+  final bool active;
+  const _QueueArtPlaceholder({this.active = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 46,
+      height: 46,
+      decoration: BoxDecoration(
+        color: active ? VColors.primary.withValues(alpha: 0.2) : VColors.card,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(Icons.music_note_rounded,
+          color: active ? VColors.primary : VColors.textMuted, size: 22),
+    );
+  }
+}
+
 // ─── Equalizer Sheet ─────────────────────────
 class _EqualizerSheet extends StatefulWidget {
   const _EqualizerSheet();
@@ -470,26 +517,18 @@ class _EqualizerSheet extends StatefulWidget {
 
 class _EqualizerSheetState extends State<_EqualizerSheet> {
   final _bands = [
-    '60Hz',
-    '170Hz',
-    '310Hz',
-    '600Hz',
-    '1kHz',
-    '3kHz',
-    '6kHz',
-    '12kHz',
-    '14kHz',
-    '16kHz'
+    '60Hz','170Hz','310Hz','600Hz','1kHz',
+    '3kHz','6kHz','12kHz','14kHz','16kHz'
   ];
   final _values = List<double>.filled(10, 0);
 
   final _presets = {
-    'Flat': [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-    'Bass': [6.0, 5.0, 3.0, 1.0, 0.0, -1.0, -1.0, -1.0, -1.0, -1.0],
-    'Treble': [-1.0, -1.0, -1.0, -1.0, 1.0, 3.0, 5.0, 6.0, 6.0, 6.0],
-    'Pop': [-1.0, 2.0, 4.0, 4.0, 2.0, 0.0, -1.0, -1.0, -1.0, -1.0],
-    'Rock': [4.0, 3.0, 2.0, 0.0, -1.0, -1.0, 2.0, 3.0, 4.0, 4.0],
-    'Jazz': [3.0, 2.0, 1.0, 2.0, -1.0, -1.0, 0.0, 1.0, 3.0, 3.0],
+    'Flat':   [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    'Bass':   [6.0, 5.0, 3.0, 1.0, 0.0,-1.0,-1.0,-1.0,-1.0,-1.0],
+    'Treble': [-1.0,-1.0,-1.0,-1.0, 1.0, 3.0, 5.0, 6.0, 6.0, 6.0],
+    'Pop':    [-1.0, 2.0, 4.0, 4.0, 2.0, 0.0,-1.0,-1.0,-1.0,-1.0],
+    'Rock':   [ 4.0, 3.0, 2.0, 0.0,-1.0,-1.0, 2.0, 3.0, 4.0, 4.0],
+    'Jazz':   [ 3.0, 2.0, 1.0, 2.0,-1.0,-1.0, 0.0, 1.0, 3.0, 3.0],
   };
 
   String _selectedPreset = 'Flat';
@@ -502,8 +541,7 @@ class _EqualizerSheetState extends State<_EqualizerSheet> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-              width: 40,
-              height: 4,
+              width: 40, height: 4,
               decoration: BoxDecoration(
                   color: VColors.divider,
                   borderRadius: BorderRadius.circular(2))),
@@ -514,8 +552,6 @@ class _EqualizerSheetState extends State<_EqualizerSheet> {
                   fontWeight: FontWeight.w700,
                   color: VColors.textPri)),
           const SizedBox(height: 16),
-
-          // Presets
           SizedBox(
             height: 36,
             child: ListView(
@@ -543,15 +579,14 @@ class _EqualizerSheetState extends State<_EqualizerSheet> {
                         style: GoogleFonts.poppins(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
-                            color: active ? Colors.white : VColors.textSec)),
+                            color:
+                                active ? Colors.white : VColors.textSec)),
                   ),
                 );
               }).toList(),
             ),
           ),
           const SizedBox(height: 20),
-
-          // Sliders
           SizedBox(
             height: 160,
             child: Row(
@@ -559,11 +594,9 @@ class _EqualizerSheetState extends State<_EqualizerSheet> {
               children: List.generate(10, (i) {
                 return Column(
                   children: [
-                    Text(
-                      '${_values[i].toInt()}',
-                      style: GoogleFonts.poppins(
-                          fontSize: 9, color: VColors.textSec),
-                    ),
+                    Text('${_values[i].toInt()}',
+                        style: GoogleFonts.poppins(
+                            fontSize: 9, color: VColors.textSec)),
                     Expanded(
                       child: RotatedBox(
                         quarterTurns: 3,
@@ -571,19 +604,15 @@ class _EqualizerSheetState extends State<_EqualizerSheet> {
                           value: _values[i],
                           min: -10,
                           max: 10,
-                          onChanged: (v) {
-                            setState(() => _values[i] = v);
-                          },
+                          onChanged: (v) => setState(() => _values[i] = v),
                           activeColor: VColors.primary,
                           inactiveColor: VColors.divider,
                         ),
                       ),
                     ),
-                    Text(
-                      _bands[i],
-                      style: GoogleFonts.poppins(
-                          fontSize: 8, color: VColors.textMuted),
-                    ),
+                    Text(_bands[i],
+                        style: GoogleFonts.poppins(
+                            fontSize: 8, color: VColors.textMuted)),
                   ],
                 );
               }),
@@ -604,15 +633,13 @@ class _SleepTimerSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final options = [5, 10, 15, 20, 30, 45, 60, 90];
-
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-              width: 40,
-              height: 4,
+              width: 40, height: 4,
               decoration: BoxDecoration(
                   color: VColors.divider,
                   borderRadius: BorderRadius.circular(2))),
@@ -624,11 +651,9 @@ class _SleepTimerSheet extends StatelessWidget {
                   color: VColors.textPri)),
           if (player.sleepMinutes > 0) ...[
             const SizedBox(height: 8),
-            Text(
-              'Stops in: ${player.sleepTimeRemaining}',
-              style:
-                  GoogleFonts.poppins(fontSize: 14, color: VColors.secondary),
-            ),
+            Text('Stops in: ${player.sleepTimeRemaining}',
+                style: GoogleFonts.poppins(
+                    fontSize: 14, color: VColors.secondary)),
           ],
           const SizedBox(height: 20),
           Wrap(
@@ -670,7 +695,8 @@ class _SleepTimerSheet extends StatelessWidget {
                     ),
                     child: Text('Cancel Timer',
                         style: GoogleFonts.poppins(
-                            color: VColors.error, fontWeight: FontWeight.w500)),
+                            color: VColors.error,
+                            fontWeight: FontWeight.w500)),
                   ),
                 ),
             ],
@@ -711,23 +737,19 @@ class _IconAction extends StatelessWidget {
                   : VColors.card,
               borderRadius: BorderRadius.circular(14),
               border: active
-                  ? Border.all(color: VColors.primary.withValues(alpha: 0.5))
+                  ? Border.all(
+                      color: VColors.primary.withValues(alpha: 0.5))
                   : null,
             ),
-            child: Icon(
-              icon,
-              color: active ? VColors.primary : VColors.textSec,
-              size: 22,
-            ),
+            child: Icon(icon,
+                color: active ? VColors.primary : VColors.textSec,
+                size: 22),
           ),
           const SizedBox(height: 6),
-          Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontSize: 11,
-              color: active ? VColors.primary : VColors.textSec,
-            ),
-          ),
+          Text(label,
+              style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  color: active ? VColors.primary : VColors.textSec)),
         ],
       ),
     );
@@ -741,7 +763,8 @@ class _AlbumPlaceholder extends StatelessWidget {
     return Container(
       color: VColors.card,
       child: const Center(
-        child: Icon(Icons.music_note_rounded, color: VColors.primary, size: 80),
+        child: Icon(Icons.music_note_rounded,
+            color: VColors.primary, size: 80),
       ),
     );
   }
