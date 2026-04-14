@@ -70,6 +70,20 @@ jobs:
             echo "⚠️ Using placeholder config"
           fi
 
+      # 4c. Validate google-services.json (fail early on malformed JSON)
+      - name: Validate google-services.json
+        run: |
+          python - <<'PY'
+import json,sys
+try:
+    with open('android/app/google-services.json','r',encoding='utf-8') as f:
+        json.load(f)
+except Exception as e:
+    print('ERROR: google-services.json is not valid JSON:', e)
+    sys.exit(2)
+print('google-services.json is valid JSON')
+PY
+
       # 5. Get version from pubspec.yaml
       - name: Get Version
         id: version
