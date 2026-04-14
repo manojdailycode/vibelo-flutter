@@ -32,6 +32,48 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
+      # 4b. Setup Firebase Configuration from Secret
+      - name: Create google-services.json from Secret
+        if: ${{ secrets.FIREBASE_CONFIG_BASE64 != '' }}
+        run: |
+          echo "${{ secrets.FIREBASE_CONFIG_BASE64 }}" | base64 -d > android/app/google-services.json
+          echo "✅ Google Services config created from secret"
+      
+      # 4c. Create Placeholder google-services.json (if secret not set)
+      - name: Create Placeholder google-services.json
+        if: ${{ secrets.FIREBASE_CONFIG_BASE64 == '' }}
+        run: |
+          cat > android/app/google-services.json << 'EOF'
+          {
+            "project_info": {
+              "project_number": "0",
+              "project_id": "vibelo-placeholder",
+              "storage_bucket": ""
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:0:android:0",
+                  "client_id": "android:com.vibelo.app",
+                  "client_type": 1,
+                  "android_client_info": {
+                    "package_name": "com.vibelo.app"
+                  }
+                },
+                "oauth_client": [],
+                "api_key": [],
+                "services": {
+                  "appinvite_service": {
+                    "other_platform_oauth_client": []
+                  }
+                }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
+          echo "⚠️  Using placeholder google-services.json. For production, add FIREBASE_CONFIG_BASE64 secret."
+
       # 5. Get version from pubspec.yaml
       - name: Get Version
         id: version
