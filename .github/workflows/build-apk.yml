@@ -41,7 +41,7 @@ jobs:
 
       # 6. Build PURE APK (universal, no architecture splits)
       - name: Build Release APK (Universal)
-        run: flutter build apk --release --no-split-per-abi
+        run: flutter build apk --release
 
       # 7. Rename APK with version
       - name: Rename APK
