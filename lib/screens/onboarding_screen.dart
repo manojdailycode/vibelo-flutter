@@ -47,8 +47,44 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              // No skip button — users must go through all 3 pages
-              const SizedBox(height: 16),
+              // ── Top bar with Skip button ──────────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const SizedBox(width: 64), // balance spacer
+                    // Page indicator dots (top center)
+                    Row(
+                      children: List.generate(
+                        _pages.length,
+                        (i) => AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          width: i == _page ? 20 : 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: i == _page ? VColors.primary : VColors.divider,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Skip button — top right
+                    TextButton(
+                      onPressed: _finish,
+                      child: Text(
+                        'Skip',
+                        style: GoogleFonts.poppins(
+                          color: VColors.textSec,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
               Expanded(
                 child: PageView.builder(
@@ -63,25 +99,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 padding: const EdgeInsets.fromLTRB(32, 0, 32, 40),
                 child: Column(
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(
-                        _pages.length,
-                        (i) => AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          width: i == _page ? 24 : 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: i == _page
-                                ? VColors.primary
-                                : VColors.divider,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,
                       height: 54,

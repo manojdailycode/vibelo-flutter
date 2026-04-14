@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -23,8 +24,6 @@ class ProfileScreen extends StatelessWidget {
           child: Column(
             children: [
               const SizedBox(height: 20),
-
-              // Header
               Text(
                 'Profile',
                 style: GoogleFonts.poppins(
@@ -35,7 +34,7 @@ class ProfileScreen extends StatelessWidget {
               ),
               const SizedBox(height: 28),
 
-              // ── FIX: Avatar edit icon now opens the edit modal ──
+              // Avatar — tap to edit
               GestureDetector(
                 onTap: auth.isGuest
                     ? null
@@ -43,7 +42,6 @@ class ProfileScreen extends StatelessWidget {
                 child: Stack(
                   alignment: Alignment.bottomRight,
                   children: [
-                    // Avatar circle
                     Container(
                       width: 90,
                       height: 90,
@@ -75,7 +73,6 @@ class ProfileScreen extends StatelessWidget {
                                 name: user?.name ?? ''),
                       ),
                     ),
-                    // Edit badge
                     if (!auth.isGuest)
                       Container(
                         width: 28,
@@ -109,7 +106,10 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(height: 20),
 
               // Premium Card
-              if (!auth.isPremium) _PremiumCard() else _PremiumActiveBadge(),
+              if (!auth.isPremium)
+                _PremiumCard(onUpgradeTap: () => _showUpgradeDialog(context))
+              else
+                _PremiumActiveBadge(),
               const SizedBox(height: 24),
 
               // Stats Row
@@ -131,7 +131,7 @@ class ProfileScreen extends StatelessWidget {
                 const SizedBox(height: 24),
               ],
 
-              // Settings Menu
+              // Preferences section
               _SettingsSection(
                 title: 'Preferences',
                 items: [
@@ -139,7 +139,7 @@ class ProfileScreen extends StatelessWidget {
                     icon: Icons.person_outline_rounded,
                     label: 'Edit Profile',
                     onTap: auth.isGuest
-                        ? () {}
+                        ? () => _showGuestSnack(context)
                         : () => _showEditProfile(context, auth),
                   ),
                   _SettingsItem(
@@ -151,13 +151,13 @@ class ProfileScreen extends StatelessWidget {
                   _SettingsItem(
                     icon: Icons.notifications_outlined,
                     label: 'Notifications',
-                    onTap: () {},
+                    onTap: () => _showNotificationsDialog(context),
                   ),
                   _SettingsItem(
                     icon: Icons.audio_file_outlined,
                     label: 'Audio Quality',
                     value: 'High',
-                    onTap: () {},
+                    onTap: () => _showAudioQualityPicker(context),
                   ),
                 ],
               ),
@@ -169,24 +169,55 @@ class ProfileScreen extends StatelessWidget {
                   _SettingsItem(
                     icon: Icons.privacy_tip_outlined,
                     label: 'Privacy Policy',
-                    onTap: () {},
+                    onTap: () => _showInfoDialog(
+                      context,
+                      title: 'Privacy Policy',
+                      content:
+                          'Vibelo collects your email and listening data to personalize your experience. '
+                          'We use Firebase for authentication and data storage. '
+                          'Your data is never sold to third parties. '
+                          'You may delete your account at any time by contacting support.\n\n'
+                          'Music is streamed from Jamendo under Creative Commons licenses.',
+                    ),
                   ),
                   _SettingsItem(
                     icon: Icons.description_outlined,
                     label: 'Terms of Service',
-                    onTap: () {},
+                    onTap: () => _showInfoDialog(
+                      context,
+                      title: 'Terms of Service',
+                      content:
+                          'By using Vibelo you agree to:\n\n'
+                          '• Use the app for personal, non-commercial listening only.\n'
+                          '• Not reproduce, redistribute, or resell any streamed content.\n'
+                          '• Comply with Jamendo\'s Creative Commons licensing terms.\n'
+                          '• Not attempt to circumvent DRM or download restrictions.\n\n'
+                          'Vibelo is provided "as is" without warranty. '
+                          'We reserve the right to update these terms at any time.',
+                    ),
                   ),
                   _SettingsItem(
                     icon: Icons.info_outline_rounded,
                     label: 'App Version',
                     value: 'v1.1.0',
-                    onTap: () {},
+                    onTap: () => _showAboutDialog(context),
                   ),
                   _SettingsItem(
                     icon: Icons.verified_outlined,
                     label: 'Music License',
                     value: 'Creative Commons',
-                    onTap: () {},
+                    onTap: () => _showInfoDialog(
+                      context,
+                      title: 'Music License',
+                      content:
+                          'All music in Vibelo is sourced from Jamendo and licensed under '
+                          'Creative Commons (CC BY, CC BY-SA, CC BY-NC, or CC BY-NC-SA).\n\n'
+                          'This means:\n'
+                          '• Free to stream for personal use\n'
+                          '• No copyright strikes\n'
+                          '• Artists retain their rights\n\n'
+                          'Learn more at jamendo.com/legal/licenses',
+                    ),
                   ),
                 ],
               ),
@@ -246,7 +277,119 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // ── FIX: Fully working edit profile sheet ──────────────────────────────
+  // ── Upgrade dialog ──────────────────────────────────────────────────────
+  void _showUpgradeDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: VColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                      colors: [Color(0xFFFFD700), Color(0xFFFF8C00)]),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.workspace_premium_rounded,
+                    color: Colors.white, size: 32),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Vibelo Premium',
+                style: GoogleFonts.poppins(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: VColors.textPri,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '₹99 / month',
+                style: GoogleFonts.poppins(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFFFFD700),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ...[
+                '🎵  Offline downloads',
+                '🚫  No ads',
+                '🎧  HD audio quality',
+                '⏰  Sleep timer',
+                '🤖  AI recommendations',
+                '🎛️  Advanced equalizer',
+              ].map((f) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        Text(f.substring(0, 2),
+                            style: const TextStyle(fontSize: 18)),
+                        const SizedBox(width: 10),
+                        Text(
+                          f.substring(3),
+                          style: GoogleFonts.poppins(
+                              color: VColors.textPri, fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  )),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: VColors.amber.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: VColors.amber.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline_rounded,
+                        color: VColors.amber, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Payments via Razorpay — coming soon!',
+                        style: GoogleFonts.poppins(
+                            color: VColors.amber, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFD700),
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: Text(
+                    'Notify Me When Available',
+                    style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Edit profile bottom sheet ────────────────────────────────────────────
   void _showEditProfile(BuildContext context, AuthProvider auth) {
     final user = auth.user;
     if (user == null) return;
@@ -279,7 +422,6 @@ class ProfileScreen extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Handle
                     Center(
                       child: Container(
                           width: 40,
@@ -298,7 +440,7 @@ class ProfileScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 20),
 
-                    // Name field
+                    // Display Name
                     Text('Display Name',
                         style: GoogleFonts.poppins(
                             fontSize: 12,
@@ -307,12 +449,16 @@ class ProfileScreen extends StatelessWidget {
                     const SizedBox(height: 6),
                     TextFormField(
                       controller: nameCtrl,
-                      style: const TextStyle(color: Colors.white),
-                      cursorColor: Colors.white,
+                      style: GoogleFonts.poppins(color: Colors.white),
+                      cursorColor: VColors.primary,
                       decoration: InputDecoration(
                         hintText: 'Your name',
+                        hintStyle:
+                            GoogleFonts.poppins(color: VColors.textMuted),
                         prefixIcon: const Icon(Icons.person_outline_rounded,
                             color: VColors.textSec, size: 20),
+                        filled: true,
+                        fillColor: VColors.card,
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                           borderSide:
@@ -323,8 +469,6 @@ class ProfileScreen extends StatelessWidget {
                           borderSide: const BorderSide(
                               color: VColors.primary, width: 1.5),
                         ),
-                        filled: true,
-                        fillColor: VColors.card,
                       ),
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
@@ -335,22 +479,44 @@ class ProfileScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
 
-                    // Photo URL field
+                    // Profile Photo URL
                     Text('Profile Photo URL',
                         style: GoogleFonts.poppins(
                             fontSize: 12,
                             color: VColors.textSec,
                             fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Paste a public image URL (Google Photos, Imgur, etc.)',
+                      style: GoogleFonts.poppins(
+                          fontSize: 11, color: VColors.textMuted),
+                    ),
                     const SizedBox(height: 6),
                     TextFormField(
                       controller: photoCtrl,
-                      style: const TextStyle(color: Colors.white),
-                      cursorColor: Colors.white,
+                      style: GoogleFonts.poppins(color: Colors.white),
+                      cursorColor: VColors.primary,
                       keyboardType: TextInputType.url,
                       decoration: InputDecoration(
                         hintText: 'https://example.com/photo.jpg',
+                        hintStyle:
+                            GoogleFonts.poppins(color: VColors.textMuted),
                         prefixIcon: const Icon(Icons.image_outlined,
                             color: VColors.textSec, size: 20),
+                        // Copy button
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.paste_rounded,
+                              color: VColors.textSec, size: 18),
+                          onPressed: () async {
+                            final data =
+                                await Clipboard.getData(Clipboard.kTextPlain);
+                            if (data?.text != null) {
+                              photoCtrl.text = data!.text!;
+                            }
+                          },
+                        ),
+                        filled: true,
+                        fillColor: VColors.card,
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                           borderSide:
@@ -361,13 +527,37 @@ class ProfileScreen extends StatelessWidget {
                           borderSide: const BorderSide(
                               color: VColors.primary, width: 1.5),
                         ),
-                        filled: true,
-                        fillColor: VColors.card,
                       ),
                     ),
-                    const SizedBox(height: 24),
 
-                    // Save button
+                    // Live preview
+                    if (photoCtrl.text.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Text('Preview: ',
+                              style: GoogleFonts.poppins(
+                                  color: VColors.textSec, fontSize: 12)),
+                          ClipOval(
+                            child: CachedNetworkImage(
+                              imageUrl: photoCtrl.text,
+                              width: 40,
+                              height: 40,
+                              fit: BoxFit.cover,
+                              errorWidget: (_, __, ___) => Container(
+                                width: 40,
+                                height: 40,
+                                color: VColors.card,
+                                child: const Icon(Icons.broken_image_outlined,
+                                    color: VColors.error, size: 20),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+
+                    const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,
                       height: 52,
@@ -377,25 +567,18 @@ class ProfileScreen extends StatelessWidget {
                             : () async {
                                 if (!formKey.currentState!.validate()) return;
                                 setModalState(() => saving = true);
-
                                 final updatedUser = user.copyWith(
                                   name: nameCtrl.text.trim(),
                                   photoUrl: photoCtrl.text.trim().isEmpty
                                       ? null
                                       : photoCtrl.text.trim(),
                                 );
-
                                 try {
-                                  // Persist to Firestore
-                                  await AuthService()
-                                      .updateUser(updatedUser);
-
-                                  // Update local auth provider state
+                                  await AuthService().updateUser(updatedUser);
                                   auth.updateUserLocally(updatedUser);
                                 } catch (e) {
                                   debugPrint('Profile save error: $e');
                                 }
-
                                 setModalState(() => saving = false);
                                 if (ctx.mounted) Navigator.pop(ctx);
                               },
@@ -429,6 +612,283 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  // ── Notifications dialog ─────────────────────────────────────────────────
+  void _showNotificationsDialog(BuildContext context) {
+    bool newReleases = true;
+    bool recommendations = true;
+    bool premiumOffers = false;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: VColors.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setState) => Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                        color: VColors.divider,
+                        borderRadius: BorderRadius.circular(2))),
+              ),
+              const SizedBox(height: 16),
+              Text('Notifications',
+                  style: GoogleFonts.poppins(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: VColors.textPri)),
+              const SizedBox(height: 20),
+              _SwitchTile(
+                  icon: Icons.new_releases_outlined,
+                  label: 'New Releases',
+                  subtitle: 'When new music is added',
+                  value: newReleases,
+                  onChanged: (v) => setState(() => newReleases = v)),
+              _SwitchTile(
+                  icon: Icons.recommend_outlined,
+                  label: 'Recommendations',
+                  subtitle: 'Personalized picks for you',
+                  value: recommendations,
+                  onChanged: (v) => setState(() => recommendations = v)),
+              _SwitchTile(
+                  icon: Icons.local_offer_outlined,
+                  label: 'Premium Offers',
+                  subtitle: 'Deals and discounts',
+                  value: premiumOffers,
+                  onChanged: (v) => setState(() => premiumOffers = v)),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: VColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline_rounded,
+                        color: VColors.primary, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Push notifications will be available in the next update.',
+                        style: GoogleFonts.poppins(
+                            color: VColors.primary, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Audio Quality picker ─────────────────────────────────────────────────
+  void _showAudioQualityPicker(BuildContext context) {
+    String selected = 'High';
+    final options = [
+      {'label': 'Low', 'sub': '64 kbps · Saves data', 'icon': Icons.signal_cellular_alt_1_bar},
+      {'label': 'Normal', 'sub': '128 kbps · Balanced', 'icon': Icons.signal_cellular_alt_2_bar},
+      {'label': 'High', 'sub': '192 kbps · Recommended', 'icon': Icons.signal_cellular_alt},
+      {'label': 'Ultra HD', 'sub': '320 kbps · Premium only 👑', 'icon': Icons.signal_cellular_4_bar},
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: VColors.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setState) => Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                        color: VColors.divider,
+                        borderRadius: BorderRadius.circular(2))),
+              ),
+              const SizedBox(height: 16),
+              Text('Audio Quality',
+                  style: GoogleFonts.poppins(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: VColors.textPri)),
+              const SizedBox(height: 16),
+              ...options.map((o) {
+                final isSelected = selected == o['label'];
+                final isPremium = o['label'] == 'Ultra HD';
+                return GestureDetector(
+                  onTap: isPremium
+                      ? () {
+                          Navigator.pop(ctx);
+                          _showUpgradeDialog(context);
+                        }
+                      : () => setState(() => selected = o['label'] as String),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? VColors.primary.withValues(alpha: 0.15)
+                          : VColors.card,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                          color: isSelected
+                              ? VColors.primary
+                              : VColors.divider),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(o['icon'] as IconData,
+                            color: isSelected
+                                ? VColors.primary
+                                : VColors.textSec,
+                            size: 22),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(o['label'] as String,
+                                  style: GoogleFonts.poppins(
+                                      color: VColors.textPri,
+                                      fontWeight: FontWeight.w600)),
+                              Text(o['sub'] as String,
+                                  style: GoogleFonts.poppins(
+                                      color: VColors.textSec, fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                        if (isSelected)
+                          const Icon(Icons.check_circle_rounded,
+                              color: VColors.primary, size: 20),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Generic info dialog ──────────────────────────────────────────────────
+  void _showInfoDialog(BuildContext context,
+      {required String title, required String content}) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: VColors.surface,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(title,
+            style: GoogleFonts.poppins(
+                color: VColors.textPri, fontWeight: FontWeight.w700)),
+        content: SingleChildScrollView(
+          child: Text(content,
+              style: GoogleFonts.poppins(
+                  color: VColors.textSec, fontSize: 14, height: 1.6)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close',
+                style: GoogleFonts.poppins(color: VColors.primary)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── App About dialog ─────────────────────────────────────────────────────
+  void _showAboutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: VColors.surface,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                    colors: [VColors.primary, VColors.secondary]),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.graphic_eq_rounded,
+                  color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Text('Vibelo',
+                style: GoogleFonts.poppins(
+                    color: VColors.textPri, fontWeight: FontWeight.w700)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _aboutRow('Version', 'v1.1.0 (build 2)'),
+            _aboutRow('Framework', 'Flutter 3.32'),
+            _aboutRow('Music Source', 'Jamendo API'),
+            _aboutRow('Auth', 'Firebase Auth'),
+            _aboutRow('Developer', 'Manoj Kumar'),
+            _aboutRow('License', 'MIT'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close',
+                style: GoogleFonts.poppins(color: VColors.primary)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _aboutRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: GoogleFonts.poppins(
+                  color: VColors.textSec, fontSize: 13)),
+          Text(value,
+              style: GoogleFonts.poppins(
+                  color: VColors.textPri,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+
+  // ── Language picker ──────────────────────────────────────────────────────
   void _showLanguagePicker(BuildContext context, AuthProvider auth) {
     showModalBottomSheet(
       context: context,
@@ -460,9 +920,75 @@ class ProfileScreen extends StatelessWidget {
       ),
     );
   }
+
+  void _showGuestSnack(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Sign in to edit your profile',
+            style: GoogleFonts.poppins()),
+        backgroundColor: VColors.primary,
+      ),
+    );
+  }
 }
 
-// ── Avatar fallback ──────────────────────────────────
+// ── Small helper widgets ──────────────────────────────────────────────────
+
+class _SwitchTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _SwitchTile({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: VColors.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: VColors.divider),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: VColors.textSec, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: GoogleFonts.poppins(
+                        color: VColors.textPri,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500)),
+                Text(subtitle,
+                    style: GoogleFonts.poppins(
+                        color: VColors.textSec, fontSize: 11)),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeThumbColor: VColors.primary,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _AvatarFallback extends StatelessWidget {
   final bool isGuest;
   final String name;
@@ -482,8 +1008,10 @@ class _AvatarFallback extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────
 class _PremiumCard extends StatelessWidget {
+  final VoidCallback onUpgradeTap;
+  const _PremiumCard({required this.onUpgradeTap});
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -527,25 +1055,25 @@ class _PremiumCard extends StatelessWidget {
             style: GoogleFonts.poppins(fontSize: 13, color: Colors.white70),
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  'Upgrade — ₹99/month',
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFFFF8C00),
-                    fontSize: 13,
-                  ),
+          // FIX: GestureDetector added so the button actually works
+          GestureDetector(
+            onTap: onUpgradeTap,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                'Upgrade — ₹99/month',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFFFF8C00),
+                  fontSize: 13,
                 ),
               ),
-            ],
+            ),
           ),
         ],
       ),
@@ -578,7 +1106,6 @@ class _PremiumActiveBadge extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────
 class _SettingsSection extends StatelessWidget {
   final String title;
   final List<_SettingsItem> items;

@@ -10,9 +10,14 @@ build/
 android/.gradle/
 android/local.properties
 android/key.properties
+*.keystore
+*.jks
 
 # Firebase — IMPORTANT: never upload this
 android/app/google-services.json
+# Local secret env files
+.env
+.env.sh
 
 # IDE
 .idea/

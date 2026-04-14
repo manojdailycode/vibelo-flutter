@@ -19,7 +19,10 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _index = 0;
-  bool _premiumPopupShown = false; // ← Local guard
+
+  // FIX: Use a static flag so it survives hot reload and widget rebuilds
+  // within the same app session.
+  static bool _popupShownThisSession = false;
 
   final _screens = const [
     HomeScreen(),
@@ -31,41 +34,79 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    // Delay to ensure the widget tree is built before showing dialog
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _showPremiumPopupOnce();
     });
   }
 
   Future<void> _showPremiumPopupOnce() async {
-    if (_premiumPopupShown) return; // ← First check: local state
-    
+    // FIX: Check session guard first — avoids async overhead on subsequent
+    // navigations that recreate MainScreen (e.g., sign-in flow).
+    if (_popupShownThisSession) return;
+    if (!mounted) return;
+
     try {
       final prefs = await SharedPreferences.getInstance();
-      final alreadyShown = prefs.getBool('premium_popup_shown') ?? false;
+      // FIX: Key 'vibelo_premium_popup_v2' — bump key if you ever want
+      // to force-show again on next launch for all users.
+      final alreadyShown = prefs.getBool('vibelo_premium_popup_v2') ?? false;
+
       if (alreadyShown || !mounted) {
-        _premiumPopupShown = true;
+        _popupShownThisSession = true;
         return;
       }
-      
-      _premiumPopupShown = true; // ← Set before showing dialog
-      await prefs.setBool('premium_popup_shown', true);
+
+      // Mark both session and persistent flags BEFORE showing dialog
+      // so a force-close during dialog still prevents re-show.
+      _popupShownThisSession = true;
+      await prefs.setBool('vibelo_premium_popup_v2', true);
+
       if (!mounted) return;
-      
+
       showDialog(
         context: context,
-        builder: (_) => AlertDialog(
+        barrierDismissible: true,
+        builder: (dialogCtx) => AlertDialog(
           backgroundColor: VColors.surface,
-          title: Text('Vibelo Premium',
-              style: GoogleFonts.poppins(
-                  color: VColors.textPri, fontWeight: FontWeight.w600)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                      colors: [Color(0xFFFFD700), Color(0xFFFF8C00)]),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.workspace_premium_rounded,
+                    color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Text('Vibelo Premium',
+                  style: GoogleFonts.poppins(
+                      color: VColors.textPri, fontWeight: FontWeight.w700)),
+            ],
+          ),
           content: Text(
-              'Premium payments will be added soon via Razorpay.\n\nFeatures coming:\n• Offline downloads\n• No ads\n• HD audio quality\n• Sleep timer\n• AI recommendations',
-              style: GoogleFonts.poppins(color: VColors.textSec, fontSize: 14)),
+            'Premium payments will be added soon via Razorpay.\n\n'
+            'Features coming:\n'
+            '• Offline downloads\n'
+            '• No ads\n'
+            '• HD audio quality\n'
+            '• Sleep timer\n'
+            '• AI recommendations',
+            style: GoogleFonts.poppins(
+                color: VColors.textSec, fontSize: 14, height: 1.6),
+          ),
           actions: [
             ElevatedButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogCtx),
               style: ElevatedButton.styleFrom(
                 backgroundColor: VColors.primary,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
               ),
               child: Text('Got it!',
                   style: GoogleFonts.poppins(color: Colors.white)),
@@ -74,8 +115,9 @@ class _MainScreenState extends State<MainScreen> {
         ),
       );
     } catch (e) {
+      // Silently fail — never crash the app over a popup
+      _popupShownThisSession = true;
       debugPrint('Premium popup error: $e');
-      _premiumPopupShown = true;
     }
   }
 
@@ -92,10 +134,7 @@ class _MainScreenState extends State<MainScreen> {
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Mini Player (visible only when a song is playing)
           if (player.hasSong) const MiniPlayer(),
-
-          // Bottom Nav
           Container(
             decoration: const BoxDecoration(
               border: Border(

@@ -2,16 +2,33 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/song_model.dart';
 
-// ─────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 //  Jamendo API — Royalty-Free Music
-//  Register FREE at: https://devportal.jamendo.com/
-//  Replace YOUR_CLIENT_ID below with your Client ID
-// ─────────────────────────────────────────────────────
+//
+//  API KEY SECURITY:
+//  The client ID is injected at compile time via --dart-define, NOT stored here.
+//  It never appears in source code or in the uploaded APK manifest.
+//
+//  To run locally:
+//    flutter run --dart-define=JAMENDO_CLIENT_ID=your_key_here
+//
+//  To build release APK locally:
+//    flutter build apk --release --dart-define=JAMENDO_CLIENT_ID=your_key_here
+//
+//  For GitHub Actions: add JAMENDO_CLIENT_ID as a Repository Secret.
+//  The workflow already passes it via --dart-define (see build-apk.yml).
+//
+//  Register free at: https://devportal.jamendo.com/
+// ─────────────────────────────────────────────────────────────────────────────
 class JamendoService {
-  static const String _clientId = ''; // ← Replace this
+  // FIX: Never hardcode API keys. This reads from compile-time constant only.
+  static const String _clientId = String.fromEnvironment(
+    'JAMENDO_CLIENT_ID',
+    defaultValue: '', // empty → API calls return empty, app won't crash
+  );
   static const String _base = 'https://api.jamendo.com/v3.0';
 
-  // ── Trending / Featured Songs ────────────────────
+  // ── Trending / Featured Songs ────────────────────────────────────────────
   Future<List<SongModel>> getTrendingSongs({int limit = 20}) async {
     return _fetchTracks(
       '$_base/tracks/?client_id=$_clientId'
@@ -21,7 +38,7 @@ class JamendoService {
     );
   }
 
-  // ── New Releases ─────────────────────────────────
+  // ── New Releases ─────────────────────────────────────────────────────────
   Future<List<SongModel>> getNewReleases({int limit = 20}) async {
     return _fetchTracks(
       '$_base/tracks/?client_id=$_clientId'
@@ -31,7 +48,7 @@ class JamendoService {
     );
   }
 
-  // ── Search Songs ─────────────────────────────────
+  // ── Search Songs ──────────────────────────────────────────────────────────
   Future<List<SongModel>> searchSongs(String query, {int limit = 20}) async {
     final encoded = Uri.encodeComponent(query);
     return _fetchTracks(
@@ -42,7 +59,7 @@ class JamendoService {
     );
   }
 
-  // ── By Genre ─────────────────────────────────────
+  // ── By Genre ──────────────────────────────────────────────────────────────
   Future<List<SongModel>> getSongsByGenre(String genre,
       {int limit = 20}) async {
     final encoded = Uri.encodeComponent(genre.toLowerCase());
@@ -54,7 +71,7 @@ class JamendoService {
     );
   }
 
-  // ── By Artist Name ───────────────────────────────
+  // ── By Artist Name ────────────────────────────────────────────────────────
   Future<List<SongModel>> getSongsByArtist(String artistName,
       {int limit = 20}) async {
     final encoded = Uri.encodeComponent(artistName);
@@ -66,16 +83,16 @@ class JamendoService {
     );
   }
 
-  // ── Mood Playlists ───────────────────────────────
+  // ── Mood Playlists ────────────────────────────────────────────────────────
   static const Map<String, String> moods = {
-    'Happy':     'happy',
-    'Sad':       'sad',
-    'Chill':     'chill',
-    'Energy':    'energetic',
-    'Focus':     'ambient',
-    'Romance':   'romantic',
-    'Party':     'party',
-    'Sleep':     'sleep',
+    'Happy':   'happy',
+    'Sad':     'sad',
+    'Chill':   'chill',
+    'Energy':  'energetic',
+    'Focus':   'ambient',
+    'Romance': 'romantic',
+    'Party':   'party',
+    'Sleep':   'sleep',
   };
 
   Future<List<SongModel>> getMoodPlaylist(String mood,
@@ -84,22 +101,27 @@ class JamendoService {
     return getSongsByGenre(tag, limit: limit);
   }
 
-  // ── Genre List ───────────────────────────────────
+  // ── Genre List ────────────────────────────────────────────────────────────
   static const List<Map<String, dynamic>> genres = [
-    {'name': 'Pop',       'tag': 'pop',       'emoji': '🎵'},
-    {'name': 'Rock',      'tag': 'rock',      'emoji': '🎸'},
-    {'name': 'Hip-Hop',   'tag': 'hiphop',    'emoji': '🎤'},
-    {'name': 'Jazz',      'tag': 'jazz',      'emoji': '🎷'},
-    {'name': 'Classical', 'tag': 'classical', 'emoji': '🎻'},
-    {'name': 'Electronic','tag': 'electronic','emoji': '🎛️'},
-    {'name': 'Ambient',   'tag': 'ambient',   'emoji': '🌊'},
-    {'name': 'Folk',      'tag': 'folk',      'emoji': '🪕'},
-    {'name': 'R&B',       'tag': 'rnb',       'emoji': '💜'},
-    {'name': 'Metal',     'tag': 'metal',     'emoji': '🤘'},
+    {'name': 'Pop',        'tag': 'pop',        'emoji': '🎵'},
+    {'name': 'Rock',       'tag': 'rock',       'emoji': '🎸'},
+    {'name': 'Hip-Hop',    'tag': 'hiphop',     'emoji': '🎤'},
+    {'name': 'Jazz',       'tag': 'jazz',       'emoji': '🎷'},
+    {'name': 'Classical',  'tag': 'classical',  'emoji': '🎻'},
+    {'name': 'Electronic', 'tag': 'electronic', 'emoji': '🎛️'},
+    {'name': 'Ambient',    'tag': 'ambient',    'emoji': '🌊'},
+    {'name': 'Folk',       'tag': 'folk',       'emoji': '🪕'},
+    {'name': 'R&B',        'tag': 'rnb',        'emoji': '💜'},
+    {'name': 'Metal',      'tag': 'metal',      'emoji': '🤘'},
   ];
 
-  // ── Internal: Fetch & Parse ──────────────────────
+  // ── Internal: Fetch & Parse ───────────────────────────────────────────────
   Future<List<SongModel>> _fetchTracks(String url) async {
+    if (_clientId.isEmpty) {
+      debugLog('⚠️  JAMENDO_CLIENT_ID not set. Run with '
+          '--dart-define=JAMENDO_CLIENT_ID=your_key');
+      return [];
+    }
     try {
       final response = await http.get(
         Uri.parse(url),
@@ -115,9 +137,13 @@ class JamendoService {
             .toList();
       }
       return [];
-    } catch (e) {
-      // Return empty on error — UI shows empty state
+    } catch (_) {
       return [];
     }
+  }
+
+  void debugLog(String msg) {
+    // ignore: avoid_print
+    assert(() { print(msg); return true; }());
   }
 }
