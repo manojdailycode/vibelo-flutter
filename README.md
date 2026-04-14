@@ -26,7 +26,7 @@ A modern, full-featured music streaming app built with Flutter. Stream royalty-f
 1. Download the latest **Vibelo-v1.1.0.apk** from [Releases](https://github.com/manojdailycode/vibelo/releases)
 2. Enable **Install from unknown sources** in Android Settings
 3. Tap the APK file to install
-4. **Android 5.0+** (API 21+) required
+4. **Android 6.0+** (API 23+) required
 
 ### From Source
 

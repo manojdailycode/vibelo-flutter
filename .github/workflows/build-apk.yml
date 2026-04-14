@@ -115,7 +115,7 @@ jobs:
             2. Enable "Install from unknown sources" in Android settings
             3. Tap the APK file to install
             
-            **Supported:** Android 5.0+ (API 21+)
+            **Supported:** Android 6.0+ (API 23+)
             
             This is a **universal APK** — works on all architectures (arm64, x86, etc.)
           files: build/app/outputs/flutter-apk/Vibelo-v${{ env.VERSION }}.apk
