@@ -1,40 +1,38 @@
+import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id("com.android.application")
-    id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
-    id("com.google.gms.google-services") // ✅ MOVED HERE - correct position
+    id("com.google.gms.google-services")
 }
 
 android {
     namespace = "com.vibelo.app"
     compileSdk = 36
-    ndkVersion = "27.0.12077973"
+    ndkVersion = "28.2.13676358"
+
+    defaultConfig {
+        applicationId = "com.vibelo.app"
+        minSdk = flutter.minSdkVersion
+        targetSdk = 34
+        versionCode = 2
+        versionName = "1.0"
+        multiDexEnabled = true
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
-    }
-
-    defaultConfig {
-        applicationId = "com.vibelo.app"
-        minSdk = 23
-        targetSdk = 36
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
-        multiDexEnabled = true
-    }
-
     signingConfigs {
         create("release") {
             val keyPropsFile = rootProject.file("key.properties")
             if (keyPropsFile.exists()) {
-                val keyProps = java.util.Properties()
-                keyPropsFile.inputStream().use { keyProps.load(it) }
+                val keyProps = Properties()
+                keyProps.load(keyPropsFile.inputStream())
                 keyAlias = keyProps["keyAlias"] as String
                 keyPassword = keyProps["keyPassword"] as String
                 storeFile = file(keyProps["storeFile"] as String)
@@ -44,16 +42,20 @@ android {
     }
 
     buildTypes {
-        release {
-            signingConfig = signingConfigs.getByName(
-                if (rootProject.file("key.properties").exists()) "release" else "debug"
-            )
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }
 
 dependencies {
     implementation("androidx.multidex:multidex:2.0.1")
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+    }
 }
 
 flutter {

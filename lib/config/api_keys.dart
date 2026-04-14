@@ -15,10 +15,6 @@
 
 class ApiKeys {
   ApiKeys._();
-
-  // ── Permanent (never expire) ─────────────────────────────────────────────
-  static const String jamendoClientId = 'YOUR_JAMENDO_CLIENT_ID';
-
   // ── Temporary / quota-based ──────────────────────────────────────────────
   //    These live in lib/services/temporary/ — deleting those files is safe,
   //    the app falls back to permanent sources automatically.

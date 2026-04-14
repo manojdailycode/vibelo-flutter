@@ -13,12 +13,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import '../models/song_model.dart';
-import 'jamendo_service.dart';
-import 'audius_service.dart';
-import 'deezer_service.dart';
-import 'temporary/youtube_service.dart';
-import 'temporary/spotify_service.dart';
-import 'temporary/soundcloud_service.dart';
+import '../services/jamendo_service.dart';
+import '../services/audius_service.dart';
+import '../services/deezer_service.dart';
+import '../services/temporary/youtube_service.dart';
+import '../services/temporary/spotify_service.dart';
+import '../services/temporary/soundcloud_service.dart';
 
 enum MusicLanguage { telugu, hindi, tamil, english, all }
 
@@ -120,7 +120,9 @@ class MusicSourceManager {
       _audius.getTeluguSongs(limit: limit ~/ 4),
       _spotify.getTeluguSongs(limit: limit ~/ 4),
     ]);
-    for (final l in futures) results.addAll(l);
+    for (final l in futures) {
+      results.addAll(l);
+    }
     return _deduplicate(results).take(limit).toList();
   }
 
@@ -132,7 +134,9 @@ class MusicSourceManager {
       _spotify.getHindiSongs(limit: limit ~/ 4),
       _audius.getHindiSongs(limit: limit ~/ 4),
     ]);
-    for (final l in futures) results.addAll(l);
+    for (final l in futures) {
+      results.addAll(l);
+    }
     return _deduplicate(results).take(limit).toList();
   }
 
@@ -144,7 +148,9 @@ class MusicSourceManager {
       _spotify.getTamilSongs(limit: limit ~/ 4),
       _audius.getTamilSongs(limit: limit ~/ 4),
     ]);
-    for (final l in futures) results.addAll(l);
+    for (final l in futures) {
+      results.addAll(l);
+    }
     return _deduplicate(results).take(limit).toList();
   }
 
@@ -155,7 +161,9 @@ class MusicSourceManager {
       _youtube.getEnglishSongs(limit: limit ~/ 3),
       _jamendo.getTrendingSongs(limit: limit ~/ 4),
     ]);
-    for (final l in futures) results.addAll(l);
+    for (final l in futures) {
+      results.addAll(l);
+    }
     return _deduplicate(results).take(limit).toList();
   }
 
@@ -167,7 +175,9 @@ class MusicSourceManager {
       _getTamilSongs(limit: 10),
       _getEnglishSongs(limit: 10),
     ]);
-    for (final l in futures) results.addAll(l);
+    for (final l in futures) {
+      results.addAll(l);
+    }
     results.shuffle();
     return results.take(limit).toList();
   }

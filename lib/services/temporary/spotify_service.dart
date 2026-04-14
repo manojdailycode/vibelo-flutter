@@ -28,9 +28,11 @@ class SpotifyService {
 
   // ── Get / refresh token (Client Credentials flow — no user login needed) ─
   Future<String?> _getToken() async {
-    final clientId     = ApiKeys.spotifyClientId;
-    final clientSecret = ApiKeys.spotifyClientSecret;
+    // ignore: prefer_const_declarations
+   final clientId = ApiKeys.spotifyClientId;
 
+// ignore: prefer_const_declarations
+   final clientSecret = ApiKeys.spotifyClientSecret;
     if (clientId == 'YOUR_SPOTIFY_CLIENT_ID') return null;
 
     // Return cached token if still valid (with 60s buffer)

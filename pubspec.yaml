@@ -24,6 +24,7 @@ dependencies:
   shimmer: ^3.0.0
   uuid: ^4.4.0
   cupertino_icons: ^1.0.6
+  share_plus: ^10.0.0
 
 dev_dependencies:
   flutter_test:
