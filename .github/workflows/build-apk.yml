@@ -40,35 +40,33 @@ jobs:
             echo "${{ secrets.FIREBASE_CONFIG_BASE64 }}" | base64 --decode > android/app/google-services.json
             echo "✅ Using real Firebase config"
           else
-            cat > android/app/google-services.json << 'EOF'
-            {
-              "project_info": {
-                "project_number": "0",
-                "project_id": "vibelo-placeholder",
-                "storage_bucket": ""
-              },
-              "client": [
-                {
-                  "client_info": {
-                    "mobilesdk_app_id": "1:0:android:0",
-                    "client_id": "android:com.vibelo.app",
-                    "client_type": 1,
-                    "android_client_info": {
-                      "package_name": "com.vibelo.app"
-                    }
-                  },
-                  "oauth_client": [],
-                  "api_key": [],
-                  "services": {
-                    "appinvite_service": {
-                      "other_platform_oauth_client": []
-                    }
-                  }
-                }
-              ],
-              "configuration_version": "1"
-            }
-            EOF
+            printf '%s\n' '{' \
+              '  "project_info": {' \
+              '    "project_number": "0",' \
+              '    "project_id": "vibelo-placeholder",' \
+              '    "storage_bucket": ""' \
+              '  },' \
+              '  "client": [' \
+              '    {' \
+              '      "client_info": {' \
+              '        "mobilesdk_app_id": "1:0:android:0",' \
+              '        "client_id": "android:com.vibelo.app",' \
+              '        "client_type": 1,' \
+              '        "android_client_info": {' \
+              '          "package_name": "com.vibelo.app"' \
+              '        }' \
+              '      },' \
+              '      "oauth_client": [],' \
+              '      "api_key": [],' \
+              '      "services": {' \
+              '        "appinvite_service": {' \
+              '          "other_platform_oauth_client": []' \
+              '        }' \
+              '      }' \
+              '    }' \
+              '  ],' \
+              '  "configuration_version": "1"' \
+              '}' > android/app/google-services.json
             echo "⚠️ Using placeholder config"
           fi
 
