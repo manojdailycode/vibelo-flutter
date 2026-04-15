@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../providers/player_provider.dart';
 import '../widgets/mini_player.dart';
@@ -20,106 +19,12 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _index = 0;
 
-  // FIX: Use a static flag so it survives hot reload and widget rebuilds
-  // within the same app session.
-  static bool _popupShownThisSession = false;
-
   final _screens = const [
     HomeScreen(),
     SearchScreen(),
     LibraryScreen(),
     ProfileScreen(),
   ];
-
-  @override
-  void initState() {
-    super.initState();
-    // Delay to ensure the widget tree is built before showing dialog
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showPremiumPopupOnce();
-    });
-  }
-
-  Future<void> _showPremiumPopupOnce() async {
-    // FIX: Check session guard first — avoids async overhead on subsequent
-    // navigations that recreate MainScreen (e.g., sign-in flow).
-    if (_popupShownThisSession) return;
-    if (!mounted) return;
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      // FIX: Key 'vibelo_premium_popup_v2' — bump key if you ever want
-      // to force-show again on next launch for all users.
-      final alreadyShown = prefs.getBool('vibelo_premium_popup_v2') ?? false;
-
-      if (alreadyShown || !mounted) {
-        _popupShownThisSession = true;
-        return;
-      }
-
-      // Mark both session and persistent flags BEFORE showing dialog
-      // so a force-close during dialog still prevents re-show.
-      _popupShownThisSession = true;
-      await prefs.setBool('vibelo_premium_popup_v2', true);
-
-      if (!mounted) return;
-
-      showDialog(
-        context: context,
-        barrierDismissible: true,
-        builder: (dialogCtx) => AlertDialog(
-          backgroundColor: VColors.surface,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                      colors: [Color(0xFFFFD700), Color(0xFFFF8C00)]),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.workspace_premium_rounded,
-                    color: Colors.white, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Text('Vibelo Premium',
-                  style: GoogleFonts.poppins(
-                      color: VColors.textPri, fontWeight: FontWeight.w700)),
-            ],
-          ),
-          content: Text(
-            'Premium payments will be added soon via Razorpay.\n\n'
-            'Features coming:\n'
-            '• Offline downloads\n'
-            '• No ads\n'
-            '• HD audio quality\n'
-            '• Sleep timer\n'
-            '• AI recommendations',
-            style: GoogleFonts.poppins(
-                color: VColors.textSec, fontSize: 14, height: 1.6),
-          ),
-          actions: [
-            ElevatedButton(
-              onPressed: () => Navigator.pop(dialogCtx),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: VColors.primary,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ),
-              child: Text('Got it!',
-                  style: GoogleFonts.poppins(color: Colors.white)),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      // Silently fail — never crash the app over a popup
-      _popupShownThisSession = true;
-      debugPrint('Premium popup error: $e');
-    }
-  }
 
   @override
   Widget build(BuildContext context) {

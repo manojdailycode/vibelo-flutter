@@ -65,7 +65,10 @@ jobs:
         run: |
           flutter build apk --release \
             --dart-define=JAMENDO_CLIENT_ID=${{ secrets.JAMENDO_CLIENT_ID }} \
-            --dart-define=JIOSAAVN_BASE_URL=${{ secrets.JIOSAAVN_BASE_URL }}
+            --dart-define=JIOSAAVN_BASE_URL=${{ secrets.JIOSAAVN_BASE_URL }} \
+            --dart-define=YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY }} \
+            --dart-define=SPOTIFY_CLIENT_ID=${{ secrets.SPOTIFY_CLIENT_ID }} \
+            --dart-define=SPOTIFY_CLIENT_SECRET=${{ secrets.SPOTIFY_CLIENT_SECRET }}
 
       - name: Rename APK
         run: |

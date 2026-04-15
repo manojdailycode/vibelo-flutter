@@ -105,13 +105,6 @@ class ProfileScreen extends StatelessWidget {
                 ),
               const SizedBox(height: 20),
 
-              // Premium Card
-              if (!auth.isPremium)
-                _PremiumCard(onUpgradeTap: () => _showUpgradeDialog(context))
-              else
-                _PremiumActiveBadge(),
-              const SizedBox(height: 24),
-
               // Stats Row
               if (!auth.isGuest) ...[
                 Row(
@@ -932,6 +925,48 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
+class _SettingsSection extends StatelessWidget {
+  final String title;
+  final List<_SettingsItem> items;
+  const _SettingsSection({required this.title, required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title,
+            style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: VColors.textSec,
+                letterSpacing: 0.5)),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: VColors.card,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: VColors.divider),
+          ),
+          child: Column(
+            children: items.asMap().entries.map((e) {
+              final isLast = e.key == items.length - 1;
+              return Column(
+                children: [
+                  e.value,
+                  if (!isLast)
+                    const Divider(
+                        height: 1, color: VColors.divider, indent: 52),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 // ── Small helper widgets ──────────────────────────────────────────────────
 
 class _SwitchTile extends StatelessWidget {
@@ -1004,146 +1039,6 @@ class _AvatarFallback extends StatelessWidget {
             fontWeight: FontWeight.w700,
             color: Colors.white),
       ),
-    );
-  }
-}
-
-class _PremiumCard extends StatelessWidget {
-  final VoidCallback onUpgradeTap;
-  const _PremiumCard({required this.onUpgradeTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFD700), Color(0xFFFF8C00)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFFFD700).withValues(alpha: 0.3),
-            blurRadius: 20,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.workspace_premium_rounded,
-                  color: Colors.white, size: 28),
-              const SizedBox(width: 10),
-              Text(
-                'Vibelo Premium',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Offline downloads • No ads • HD audio\nEqualizer • AI recommendations',
-            style: GoogleFonts.poppins(fontSize: 13, color: Colors.white70),
-          ),
-          const SizedBox(height: 16),
-          // FIX: GestureDetector added so the button actually works
-          GestureDetector(
-            onTap: onUpgradeTap,
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                'Upgrade — ₹99/month',
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFFFF8C00),
-                  fontSize: 13,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PremiumActiveBadge extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: BoxDecoration(
-        color: VColors.amber.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: VColors.amber.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.workspace_premium_rounded,
-              color: VColors.amber, size: 22),
-          const SizedBox(width: 8),
-          Text('Premium Active',
-              style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.w600, color: VColors.amber)),
-        ],
-      ),
-    );
-  }
-}
-
-class _SettingsSection extends StatelessWidget {
-  final String title;
-  final List<_SettingsItem> items;
-  const _SettingsSection({required this.title, required this.items});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title,
-            style: GoogleFonts.poppins(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: VColors.textSec,
-                letterSpacing: 0.5)),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: VColors.card,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: VColors.divider),
-          ),
-          child: Column(
-            children: items.asMap().entries.map((e) {
-              final isLast = e.key == items.length - 1;
-              return Column(
-                children: [
-                  e.value,
-                  if (!isLast)
-                    const Divider(
-                        height: 1, color: VColors.divider, indent: 52),
-                ],
-              );
-            }).toList(),
-          ),
-        ),
-      ],
     );
   }
 }

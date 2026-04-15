@@ -18,7 +18,6 @@ import '../services/audius_service.dart';
 import '../services/deezer_service.dart';
 import '../services/temporary/youtube_service.dart';
 import '../services/temporary/spotify_service.dart';
-import '../services/temporary/soundcloud_service.dart';
 
 enum MusicLanguage { telugu, hindi, tamil, english, all }
 
@@ -31,7 +30,6 @@ class MusicSourceManager {
   final _jamendo     = JamendoService();
   final _youtube     = YouTubeService();
   final _spotify     = SpotifyService();
-  final _soundcloud  = SoundCloudService();
 
   // ── SEARCH — tries all sources, merges results ───────────────────────────
   Future<List<SongModel>> search(String query, {int limit = 25}) async {
@@ -43,7 +41,6 @@ class MusicSourceManager {
       _audius.search(query, limit: limit ~/ 3),
       _youtube.search(query, limit: limit ~/ 3),
       _spotify.search(query, limit: limit ~/ 3),
-      _soundcloud.search(query, limit: limit ~/ 4),
     ]);
 
     for (final list in futures) {

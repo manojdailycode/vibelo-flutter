@@ -190,10 +190,23 @@ class _LibraryScreenState extends State<LibraryScreen>
               const SizedBox(height: 16),
               TextField(
                 controller: nameCtrl,
-                style: GoogleFonts.poppins(color: VColors.textPri),
+                style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
+                cursorColor: VColors.primary,
                 autofocus: true,
-                decoration: const InputDecoration(
-                    hintText: 'Playlist name'),
+                decoration: InputDecoration(
+                  hintText: 'Playlist name',
+                  hintStyle: GoogleFonts.poppins(color: VColors.textMuted),
+                  filled: true,
+                  fillColor: VColors.card,
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: VColors.divider),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: VColors.primary, width: 1.5),
+                  ),
+                ),
               ),
             ],
           ),
