@@ -8,6 +8,7 @@ import 'theme/app_theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/music_provider.dart';
 import 'providers/player_provider.dart';
+import 'providers/playlist_provider.dart';
 import 'services/audio_handler.dart';
 import 'screens/splash_screen.dart';
 
@@ -80,6 +81,13 @@ class VibeleApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => MusicProvider()),
         ChangeNotifierProvider(create: (_) => PlayerProvider(audioHandler)),
+        ChangeNotifierProxyProvider<AuthProvider, PlaylistProvider>(
+          // `create` makes an initial instance with a dummy AuthProvider.
+          // It's immediately updated by the `update` callback below.
+          create: (context) => PlaylistProvider(authProvider: AuthProvider()),
+          update: (context, auth, previous) =>
+              previous!..updateAuthProvider(auth),
+        ),
       ],
       child: MaterialApp(
         title: 'Vibelo',

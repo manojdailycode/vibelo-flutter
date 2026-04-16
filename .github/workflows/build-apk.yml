@@ -28,28 +28,33 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
+      # ✅ FIXED HERE
       - name: Setup google-services.json
+        env:
+          FIREBASE_CONFIG_BASE64: ${{ secrets.FIREBASE_CONFIG_BASE64 }}
         run: |
-          if [ -n "${{ secrets.FIREBASE_CONFIG_BASE64 }}" ]; then
-            echo "${{ secrets.FIREBASE_CONFIG_BASE64 }}" | base64 --decode > android/app/google-services.json
+          if [ -n "$FIREBASE_CONFIG_BASE64" ]; then
+            echo "$FIREBASE_CONFIG_BASE64" | base64 --decode > android/app/google-services.json
             echo "Firebase config set"
           else
-            cat > android/app/google-services.json << 'EOF'
-            {"project_info":{"project_number":"0","project_id":"vibelo-placeholder","storage_bucket":""},"client":[{"client_info":{"mobilesdk_app_id":"1:0:android:0","android_client_info":{"package_name":"com.vibelo.app"}},"oauth_client":[],"api_key":[],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}
-            EOF
+            echo '{"project_info":{"project_number":"0","project_id":"vibelo-placeholder","storage_bucket":""},"client":[{"client_info":{"mobilesdk_app_id":"1:0:android:0","android_client_info":{"package_name":"com.vibelo.app"}},"oauth_client":[],"api_key":[],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}' > android/app/google-services.json
             echo "Using placeholder Firebase config"
           fi
 
+      # ✅ FIXED HERE
       - name: Setup Keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
-            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/vibelo-release.keystore
-            cat > android/key.properties << EOF
-            storePassword=${{ secrets.KEYSTORE_PASSWORD }}
-            keyPassword=${{ secrets.KEY_PASSWORD }}
-            keyAlias=${{ secrets.KEY_ALIAS }}
-            storeFile=vibelo-release.keystore
-            EOF
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > android/app/vibelo-release.keystore
+            echo "storePassword=$KEYSTORE_PASSWORD" > android/key.properties
+            echo "keyPassword=$KEY_PASSWORD" >> android/key.properties
+            echo "keyAlias=$KEY_ALIAS" >> android/key.properties
+            echo "storeFile=vibelo-release.keystore" >> android/key.properties
             echo "Real keystore configured"
           else
             echo "No keystore — using debug signing"
@@ -62,23 +67,20 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Build Release APK
+        env:
+          JAMENDO_CLIENT_ID: ${{ secrets.JAMENDO_CLIENT_ID }}
+          JIOSAAVN_BASE_URL: ${{ secrets.JIOSAAVN_BASE_URL }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
         run: |
           flutter build apk --release \
-            --dart-define=JAMENDO_CLIENT_ID=${{ secrets.JAMENDO_CLIENT_ID }} \
-            --dart-define=JIOSAAVN_BASE_URL=${{ secrets.JIOSAAVN_BASE_URL }} \
-            --dart-define=YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY }} \
-            --dart-define=SPOTIFY_CLIENT_ID=${{ secrets.SPOTIFY_CLIENT_ID }} \
-            --dart-define=SPOTIFY_CLIENT_SECRET=${{ secrets.SPOTIFY_CLIENT_SECRET }}
+            --dart-define=JAMENDO_CLIENT_ID=$JAMENDO_CLIENT_ID \
+            --dart-define=JIOSAAVN_BASE_URL=$JIOSAAVN_BASE_URL \
+            --dart-define=YOUTUBE_API_KEY=$YOUTUBE_API_KEY
 
       - name: Rename APK
         run: |
           mv build/app/outputs/flutter-apk/app-release.apk \
              build/app/outputs/flutter-apk/Vibelo-v${{ env.VERSION }}.apk
-
-      - name: Delete Old Release
-        run: gh release delete "v${{ env.VERSION }}" --yes || true
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload to GitHub Releases
         uses: softprops/action-gh-release@v2
@@ -89,7 +91,5 @@ jobs:
             ## Vibelo v${{ env.VERSION }}
             Download the APK below and install on Android 6.0+
           files: build/app/outputs/flutter-apk/Vibelo-v${{ env.VERSION }}.apk
-          draft: false
-          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

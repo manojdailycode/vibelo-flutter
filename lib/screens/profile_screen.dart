@@ -110,15 +110,21 @@ class ProfileScreen extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    _Stat(
-                        label: 'Liked Songs',
-                        value: '${user?.likedSongIds.length ?? 0}'),
+                    Flexible(
+                      child: _Stat(
+                          label: 'Liked Songs',
+                          value: '${user?.likedSongIds.length ?? 0}'),
+                    ),
                     _StatDivider(),
-                    const _Stat(label: 'Playlists', value: '4'),
+                    const Flexible(
+                      child: _Stat(label: 'Playlists', value: '4'),
+                    ),
                     _StatDivider(),
-                    _Stat(
-                        label: 'Artists Followed',
-                        value: '${user?.followedArtists.length ?? 0}'),
+                    Flexible(
+                      child: _Stat(
+                          label: 'Artists Followed',
+                          value: '${user?.followedArtists.length ?? 0}'),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 24),
@@ -263,118 +269,6 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 100),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── Upgrade dialog ──────────────────────────────────────────────────────
-  void _showUpgradeDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => Dialog(
-        backgroundColor: VColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                      colors: [Color(0xFFFFD700), Color(0xFFFF8C00)]),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.workspace_premium_rounded,
-                    color: Colors.white, size: 32),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Vibelo Premium',
-                style: GoogleFonts.poppins(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: VColors.textPri,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '₹99 / month',
-                style: GoogleFonts.poppins(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFFFFD700),
-                ),
-              ),
-              const SizedBox(height: 16),
-              ...[
-                '🎵  Offline downloads',
-                '🚫  No ads',
-                '🎧  HD audio quality',
-                '⏰  Sleep timer',
-                '🤖  AI recommendations',
-                '🎛️  Advanced equalizer',
-              ].map((f) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      children: [
-                        Text(f.substring(0, 2),
-                            style: const TextStyle(fontSize: 18)),
-                        const SizedBox(width: 10),
-                        Text(
-                          f.substring(3),
-                          style: GoogleFonts.poppins(
-                              color: VColors.textPri, fontSize: 14),
-                        ),
-                      ],
-                    ),
-                  )),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: VColors.amber.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                      color: VColors.amber.withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline_rounded,
-                        color: VColors.amber, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Payments via Razorpay — coming soon!',
-                        style: GoogleFonts.poppins(
-                            color: VColors.amber, fontSize: 12),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFD700),
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
-                  ),
-                  child: Text(
-                    'Notify Me When Available',
-                    style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
@@ -609,7 +503,6 @@ class ProfileScreen extends StatelessWidget {
   void _showNotificationsDialog(BuildContext context) {
     bool newReleases = true;
     bool recommendations = true;
-    bool premiumOffers = false;
 
     showModalBottomSheet(
       context: context,
@@ -650,12 +543,6 @@ class ProfileScreen extends StatelessWidget {
                   subtitle: 'Personalized picks for you',
                   value: recommendations,
                   onChanged: (v) => setState(() => recommendations = v)),
-              _SwitchTile(
-                  icon: Icons.local_offer_outlined,
-                  label: 'Premium Offers',
-                  subtitle: 'Deals and discounts',
-                  value: premiumOffers,
-                  onChanged: (v) => setState(() => premiumOffers = v)),
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -693,7 +580,7 @@ class ProfileScreen extends StatelessWidget {
       {'label': 'Low', 'sub': '64 kbps · Saves data', 'icon': Icons.signal_cellular_alt_1_bar},
       {'label': 'Normal', 'sub': '128 kbps · Balanced', 'icon': Icons.signal_cellular_alt_2_bar},
       {'label': 'High', 'sub': '192 kbps · Recommended', 'icon': Icons.signal_cellular_alt},
-      {'label': 'Ultra HD', 'sub': '320 kbps · Premium only 👑', 'icon': Icons.signal_cellular_4_bar},
+      {'label': 'Ultra HD', 'sub': '320 kbps · Best quality', 'icon': Icons.signal_cellular_4_bar},
     ];
 
     showModalBottomSheet(
@@ -725,14 +612,8 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(height: 16),
               ...options.map((o) {
                 final isSelected = selected == o['label'];
-                final isPremium = o['label'] == 'Ultra HD';
                 return GestureDetector(
-                  onTap: isPremium
-                      ? () {
-                          Navigator.pop(ctx);
-                          _showUpgradeDialog(context);
-                        }
-                      : () => setState(() => selected = o['label'] as String),
+                  onTap: () => setState(() => selected = o['label'] as String),
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 10),
                     padding: const EdgeInsets.all(14),
@@ -1016,7 +897,7 @@ class _SwitchTile extends StatelessWidget {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeThumbColor: VColors.primary,
+            thumbColor: WidgetStateProperty.all(VColors.primary),
           ),
         ],
       ),

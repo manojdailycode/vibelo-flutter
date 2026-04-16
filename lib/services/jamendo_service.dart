@@ -59,6 +59,25 @@ class JamendoService {
     );
   }
 
+  // --- Search Albums & Artists (Placeholders) -----------------------------
+  Future<List<AlbumModel>> searchAlbums(String query, {int limit = 20}) async {
+    final url = '$_base/albums/?client_id=$_clientId&format=json&limit=$limit&search=${Uri.encodeComponent(query)}';
+    final res = await http.get(Uri.parse(url));
+    if (res.statusCode != 200) return [];
+    final data = json.decode(res.body);
+    final items = data['results'] as List? ?? [];
+    return items.map((item) => AlbumModel.fromJamendo(item)).toList();
+  }
+
+  Future<List<ArtistModel>> searchArtists(String query, {int limit = 20}) async {
+    final url = '$_base/artists/?client_id=$_clientId&format=json&limit=$limit&search=${Uri.encodeComponent(query)}';
+    final res = await http.get(Uri.parse(url));
+    if (res.statusCode != 200) return [];
+    final data = json.decode(res.body);
+    final items = data['results'] as List? ?? [];
+    return items.map((item) => ArtistModel.fromJamendo(item)).toList();
+  }
+
   // ── By Genre ──────────────────────────────────────────────────────────────
   Future<List<SongModel>> getSongsByGenre(String genre,
       {int limit = 20}) async {

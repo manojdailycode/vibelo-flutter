@@ -1,23 +1,20 @@
 // ─────────────────────────────────────────────────────────────────────────────
 //  music_source_manager.dart  —  CORE FILE — NEVER DELETE
 //
-//  Manages all music sources with automatic fallback.
-//  If any temporary service file is deleted, this manager skips it gracefully.
-//  Priority order:
-//    1. Deezer   (no key, 30s previews, all Indian films)
-//    2. Audius   (no key, full songs, independent artists)
-//    3. YouTube  (API key needed, full songs via video player)
-//    4. Spotify  (API key needed, 30s previews)
-//    5. SoundCloud (API key needed, full songs)
-//    6. Jamendo  (API key needed, Western/World music)
+//  Manages all music sources and provides a unified search API.
+//  It fetches songs, albums, and artists from multiple platforms, respecting
+//  a priority order to ensure the most relevant results appear first.
+//
+//  Search Priority: YouTube → Spotify → Deezer → Jamendo → Audius
+//  Updated Search Priority: JioSaavn → YouTube → Spotify → Deezer → Jamendo → Audius
 // ─────────────────────────────────────────────────────────────────────────────
 
 import '../models/song_model.dart';
-import '../services/jamendo_service.dart';
 import '../services/audius_service.dart';
 import '../services/deezer_service.dart';
-import '../services/temporary/youtube_service.dart';
-import '../services/temporary/spotify_service.dart';
+import '../services/jamendo_service.dart';
+import '../services/jiosaavn_service.dart';
+import '../services/youtube_service.dart';
 
 enum MusicLanguage { telugu, hindi, tamil, english, all }
 
@@ -25,29 +22,61 @@ class MusicSourceManager {
   MusicSourceManager._();
   static final MusicSourceManager instance = MusicSourceManager._();
 
+  // Service instances in priority order for search
+  final _jiosaavn = JioSaavnService();
+  final _youtube = YouTubeService();
   final _deezer      = DeezerService();
+  final _jamendo = JamendoService();
   final _audius      = AudiusService();
-  final _jamendo     = JamendoService();
-  final _youtube     = YouTubeService();
-  final _spotify     = SpotifyService();
 
-  // ── SEARCH — tries all sources, merges results ───────────────────────────
-  Future<List<SongModel>> search(String query, {int limit = 25}) async {
-    final results = <SongModel>[];
-
-    // Run all sources in parallel for speed
-    final futures = await Future.wait([
-      _deezer.search(query, limit: limit ~/ 2),
-      _audius.search(query, limit: limit ~/ 3),
-      _youtube.search(query, limit: limit ~/ 3),
-      _spotify.search(query, limit: limit ~/ 3),
-    ]);
-
-    for (final list in futures) {
-      results.addAll(list);
+  // ── UNIFIED SEARCH — fetches all content types with priority ───────────
+  Future<SearchResults> searchAll(String query, {int limitPerType = 15}) async {
+    // --- Songs ---
+    final songs = <SongModel>[];
+    final songSeen = <String>{};
+    void addUniqueSongs(List<SongModel> items) {
+      songs.addAll(items.where((s) => songSeen.add('${s.title.toLowerCase()}_${s.artist.toLowerCase()}')));
     }
+    addUniqueSongs(await _jiosaavn.searchSongs(query, limit: limitPerType));
+    addUniqueSongs(await _youtube.search(query, limit: limitPerType));
+    addUniqueSongs(await _deezer.search(query, limit: limitPerType));
+    addUniqueSongs(await _jamendo.searchSongs(query, limit: limitPerType));
+    addUniqueSongs(await _audius.search(query, limit: limitPerType));
 
-    return _deduplicate(results).take(limit).toList();
+    // --- Albums ---
+    final albums = <AlbumModel>[];
+    final albumSeen = <String>{};
+    void addUniqueAlbums(List<AlbumModel> items) {
+      albums.addAll(items.where((a) => albumSeen.add('${a.title.toLowerCase()}_${a.artist?.toLowerCase()}')));
+    }
+    // Note: Not all services may have album search implemented yet.
+    addUniqueAlbums(await _jiosaavn.searchAlbums(query, limit: limitPerType));
+    addUniqueAlbums(await _deezer.searchAlbums(query, limit: limitPerType));
+    addUniqueAlbums(await _jamendo.searchAlbums(query, limit: limitPerType));
+    addUniqueAlbums(await _audius.searchAlbums(query, limit: limitPerType));
+
+    // --- Artists ---
+    final artists = <ArtistModel>[];
+    final artistSeen = <String>{};
+    void addUniqueArtists(List<ArtistModel> items) {
+      artists.addAll(items.where((a) => artistSeen.add(a.name.toLowerCase())));
+    }
+    // Note: Not all services may have artist search implemented yet.
+    addUniqueArtists(await _jiosaavn.searchArtists(query, limit: limitPerType));
+    addUniqueArtists(await _deezer.searchArtists(query, limit: limitPerType));
+    addUniqueArtists(await _jamendo.searchArtists(query, limit: limitPerType));
+    addUniqueArtists(await _audius.searchArtists(query, limit: limitPerType));
+
+    // --- Playlists ---
+    final playlists = <PlaylistModel>[];
+    // Playlist search logic can be added here when services support it.
+
+    return SearchResults(
+      songs: songs.take(50).toList(), // Cap total results
+      albums: albums.take(20).toList(),
+      artists: artists.take(20).toList(),
+      playlists: playlists.take(20).toList(),
+    );
   }
 
   // ── TRENDING ─────────────────────────────────────────────────────────────
@@ -89,9 +118,6 @@ class MusicSourceManager {
 
   // ── NEW RELEASES ─────────────────────────────────────────────────────────
   Future<List<SongModel>> getNewReleases({int limit = 20}) async {
-    final spotify = await _spotify.getNewReleases(limit: limit);
-    if (spotify.isNotEmpty) return spotify;
-
     final jamendo = await _jamendo.getNewReleases(limit: limit);
     if (jamendo.isNotEmpty) return jamendo;
 
@@ -115,7 +141,6 @@ class MusicSourceManager {
       _deezer.getTeluguSongs(limit: limit ~/ 2),
       _youtube.getTeluguSongs(limit: limit ~/ 3),
       _audius.getTeluguSongs(limit: limit ~/ 4),
-      _spotify.getTeluguSongs(limit: limit ~/ 4),
     ]);
     for (final l in futures) {
       results.addAll(l);
@@ -128,7 +153,6 @@ class MusicSourceManager {
     final futures = await Future.wait([
       _deezer.getHindiSongs(limit: limit ~/ 2),
       _youtube.getHindiSongs(limit: limit ~/ 3),
-      _spotify.getHindiSongs(limit: limit ~/ 4),
       _audius.getHindiSongs(limit: limit ~/ 4),
     ]);
     for (final l in futures) {
@@ -142,7 +166,6 @@ class MusicSourceManager {
     final futures = await Future.wait([
       _deezer.getTamilSongs(limit: limit ~/ 2),
       _youtube.getTamilSongs(limit: limit ~/ 3),
-      _spotify.getTamilSongs(limit: limit ~/ 4),
       _audius.getTamilSongs(limit: limit ~/ 4),
     ]);
     for (final l in futures) {

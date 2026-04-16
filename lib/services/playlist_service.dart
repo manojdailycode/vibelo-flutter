@@ -77,9 +77,11 @@ class PlaylistService {
         'id': song.id,
         'title': song.title,
         'artist': song.artist,
+        'album': song.album,
         'audioUrl': song.audioUrl,
         'imageUrl': song.imageUrl,
         'duration': song.duration,
+        'source': song.source,
       };
 
       await ref.update({

@@ -3,9 +3,12 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../providers/auth_provider.dart';
+import '../providers/playlist_provider.dart';
 import '../providers/music_provider.dart';
 import '../widgets/song_tile.dart';
-import '../services/playlist_service.dart';
+import '../models/song_model.dart';
+import 'playlist_detail_screen.dart';
+import '../widgets/create_playlist_sheet.dart';
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
@@ -17,26 +20,11 @@ class LibraryScreen extends StatefulWidget {
 class _LibraryScreenState extends State<LibraryScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tab;
-  final _playlistService = PlaylistService();
-  List<Map<String, dynamic>> _playlists = [];
-  bool _loadingPlaylists = false;
 
   @override
   void initState() {
     super.initState();
     _tab = TabController(length: 3, vsync: this);
-    _loadPlaylists();
-  }
-
-  Future<void> _loadPlaylists() async {
-    final auth = context.read<AuthProvider>();
-    if (auth.isGuest || auth.user == null) return;
-    setState(() => _loadingPlaylists = true);
-    final list = await _playlistService.getPlaylists(auth.user!.uid);
-    setState(() {
-      _playlists = list;
-      _loadingPlaylists = false;
-    });
   }
 
   @override
@@ -63,7 +51,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                           fontWeight: FontWeight.w700,
                           color: VColors.textPri)),
                   IconButton(
-                    onPressed: _showCreatePlaylistDialog,
+                    onPressed: _showCreatePlaylistSheet,
                     icon: Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
@@ -111,15 +99,13 @@ class _LibraryScreenState extends State<LibraryScreen>
                 controller: _tab,
                 children: [
                   _LikedTab(),
-                  _PlaylistsTab(
-                    playlists: _playlists,
-                    loading: _loadingPlaylists,
-                    onDelete: (id) async {
-                      final auth = context.read<AuthProvider>();
-                      if (auth.user == null) return;
-                      await _playlistService.deletePlaylist(auth.user!.uid, id);
-                      _loadPlaylists();
-                    },
+                  Consumer<PlaylistProvider>(
+                    builder: (context, playlistProvider, child) => _PlaylistsTab(
+                      playlists: playlistProvider.playlists,
+                      loading: playlistProvider.isLoading,
+                      onDelete: (id) => playlistProvider.deletePlaylist(id),
+                      onCreate: _showCreatePlaylistSheet,
+                    ),
                   ),
                   _RecentTab(),
                 ],
@@ -131,7 +117,7 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 
-  void _showCreatePlaylistDialog() {
+  void _showCreatePlaylistSheet() {
     final auth = context.read<AuthProvider>();
     if (auth.isGuest) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -144,96 +130,11 @@ class _LibraryScreenState extends State<LibraryScreen>
       return;
     }
 
-    final nameCtrl = TextEditingController();
-    String selectedEmoji = '🎵';
-    final emojis = ['🎵', '🎸', '💜', '🌅', '💪', '🌙', '🎯', '🎉', '😌', '⚡'];
-
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => AlertDialog(
-          backgroundColor: VColors.surface,
-          title: Text('New Playlist',
-              style: GoogleFonts.poppins(
-                  color: VColors.textPri, fontWeight: FontWeight.w600)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Emoji picker
-              SizedBox(
-                height: 50,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: emojis.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (_, i) => GestureDetector(
-                    onTap: () => setS(() => selectedEmoji = emojis[i]),
-                    child: Container(
-                      width: 40, height: 40,
-                      decoration: BoxDecoration(
-                        color: selectedEmoji == emojis[i]
-                            ? VColors.primary.withValues(alpha: 0.3)
-                            : VColors.card,
-                        borderRadius: BorderRadius.circular(10),
-                        border: selectedEmoji == emojis[i]
-                            ? Border.all(color: VColors.primary)
-                            : null,
-                      ),
-                      child: Center(
-                        child: Text(emojis[i],
-                            style: const TextStyle(fontSize: 20)),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: nameCtrl,
-                style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
-                cursorColor: VColors.primary,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: 'Playlist name',
-                  hintStyle: GoogleFonts.poppins(color: VColors.textMuted),
-                  filled: true,
-                  fillColor: VColors.card,
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: VColors.divider),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: VColors.primary, width: 1.5),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel',
-                  style: GoogleFonts.poppins(color: VColors.textSec)),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (nameCtrl.text.trim().isEmpty) return;
-                final uid = auth.user!.uid;
-                await _playlistService.createPlaylist(
-                  userId: uid,
-                  name: nameCtrl.text.trim(),
-                  emoji: selectedEmoji,
-                );
-                if (ctx.mounted) Navigator.pop(ctx);
-                _loadPlaylists();
-              },
-              child: Text('Create',
-                  style: GoogleFonts.poppins(color: Colors.white)),
-            ),
-          ],
-        ),
-      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const CreatePlaylistSheet(),
     );
   }
 }
@@ -242,11 +143,16 @@ class _LibraryScreenState extends State<LibraryScreen>
 class _LikedTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
-    final music = context.watch<MusicProvider>();
-    final liked = music.trending.where((s) => auth.isLiked(s.id)).toList();
+    // PERF: Use `select` to prevent rebuilding when unrelated properties change.
+    final isGuest = context.select<AuthProvider, bool>((a) => a.isGuest);
+    final likedSongIds = context.select<AuthProvider, List<String>>((a) => a.user?.likedSongIds ?? const []);
+    final trendingSongs = context.select<MusicProvider, List<SongModel>>((m) => m.trending);
 
-    if (auth.isGuest) {
+    // NOTE: This logic only shows liked songs that are also in the trending list.
+    // A proper implementation would fetch all liked songs by their IDs.
+    final liked = trendingSongs.where((s) => likedSongIds.contains(s.id)).toList();
+
+    if (isGuest) {
       return const _EmptyState(
         icon: Icons.person_outline_rounded,
         title: 'Sign in to see liked songs',
@@ -273,11 +179,13 @@ class _PlaylistsTab extends StatelessWidget {
   final List<Map<String, dynamic>> playlists;
   final bool loading;
   final void Function(String id) onDelete;
+  final VoidCallback onCreate;
 
   const _PlaylistsTab({
     required this.playlists,
     required this.loading,
     required this.onDelete,
+    required this.onCreate,
   });
 
   @override
@@ -285,39 +193,37 @@ class _PlaylistsTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       children: [
-        // Downloads premium card
-        Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-                colors: [Color(0xFFFFD700), Color(0xFFFF8C00)]),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.download_done_rounded,
-                  color: Colors.white, size: 28),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Downloads',
-                        style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w700, color: Colors.white)),
-                    Text('Premium — offline listening',
-                        style: GoogleFonts.poppins(
-                            fontSize: 12, color: Colors.white70)),
-                  ],
+        InkWell(
+          onTap: onCreate,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 16, top: 8),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: VColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: VColors.primary.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 52, height: 52,
+                  decoration: BoxDecoration(
+                    color: VColors.primary.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.add_rounded, color: VColors.primary, size: 28),
                 ),
-              ),
-              const Icon(Icons.workspace_premium_rounded,
-                  color: Colors.white, size: 22),
-            ],
+                const SizedBox(width: 14),
+                Text('Create New Playlist',
+                    style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w600,
+                        color: VColors.primary,
+                        fontSize: 15)),
+              ],
+            ),
           ),
         ),
-
         if (loading)
           const Center(
             child: Padding(
@@ -329,9 +235,9 @@ class _PlaylistsTab extends StatelessWidget {
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 32),
             child: _EmptyState(
-              icon: Icons.playlist_add_rounded,
-              title: 'No playlists yet',
-              subtitle: 'Tap + to create your first playlist',
+              icon: Icons.my_library_music_rounded,
+              title: 'Your library is empty',
+              subtitle: 'Tap above to create your first playlist',
             ),
           )
         else
@@ -354,67 +260,78 @@ class _PlaylistCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final songs =
         (playlist['songs'] as List?)?.length ?? 0;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: VColors.card,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: VColors.divider),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 52, height: 52,
-            decoration: BoxDecoration(
-              gradient: VColors.primaryGrad,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(
-              child: Text(
-                playlist['emoji'] ?? '🎵',
-                style: const TextStyle(fontSize: 24),
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PlaylistDetailScreen(playlist: playlist),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: VColors.card,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: VColors.divider),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52, height: 52,
+              decoration: BoxDecoration(
+                gradient: VColors.primaryGrad,
+                borderRadius: BorderRadius.circular(12),
               ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(playlist['name'] ?? 'Playlist',
-                    style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w600,
-                        color: VColors.textPri,
-                        fontSize: 15)),
-                Text('$songs songs',
-                    style: GoogleFonts.poppins(
-                        fontSize: 12, color: VColors.textSec)),
-              ],
-            ),
-          ),
-          PopupMenuButton<String>(
-            color: VColors.surface,
-            icon: const Icon(Icons.more_vert_rounded, color: VColors.textSec),
-            onSelected: (v) {
-              if (v == 'delete') onDelete();
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    const Icon(Icons.delete_outline_rounded,
-                        color: VColors.error, size: 18),
-                    const SizedBox(width: 8),
-                    Text('Delete',
-                        style: GoogleFonts.poppins(color: VColors.error)),
-                  ],
+              child: Center(
+                child: Text(
+                  playlist['emoji'] ?? '🎵',
+                  style: const TextStyle(fontSize: 24),
                 ),
               ),
-            ],
-          ),
-        ],
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(playlist['name'] ?? 'Playlist',
+                      style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          color: VColors.textPri,
+                          fontSize: 15)),
+                  Text('$songs songs',
+                      style: GoogleFonts.poppins(
+                          fontSize: 12, color: VColors.textSec)),
+                ],
+              ),
+            ),
+            PopupMenuButton<String>(
+              color: VColors.surface,
+              icon: const Icon(Icons.more_vert_rounded, color: VColors.textSec),
+              onSelected: (v) {
+                if (v == 'delete') onDelete();
+              },
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.delete_outline_rounded,
+                          color: VColors.error, size: 18),
+                      const SizedBox(width: 8),
+                      Text('Delete',
+                          style: GoogleFonts.poppins(color: VColors.error)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

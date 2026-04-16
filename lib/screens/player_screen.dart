@@ -5,6 +5,10 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../theme/app_theme.dart';
 import '../providers/player_provider.dart';
 import '../providers/auth_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import '../providers/playlist_provider.dart';
+import '../models/song_model.dart';
+import '../widgets/create_playlist_sheet.dart';
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key});
@@ -319,12 +323,27 @@ class _PlayerScreenState extends State<PlayerScreen>
                         _IconAction(
                           icon: Icons.playlist_add_rounded,
                           label: 'Add to List',
-                          onTap: () {},
+                          onTap: () {
+                            if (auth.isGuest || auth.user == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Text('Sign in to add to playlists', style: GoogleFonts.poppins()),
+                                backgroundColor: VColors.primary,
+                              ));
+                              return;
+                            }
+                            _showAddToPlaylistDialog(context, auth.user!.uid, song);
+                          },
                         ),
                         _IconAction(
                           icon: Icons.share_outlined,
                           label: 'Share',
-                          onTap: () {},
+                          onTap: () {
+                            final isYouTube = song.audioUrl.startsWith('youtube');
+                            final shareText = isYouTube
+                                ? '🎵 Listen to "${song.title}" by ${song.artist} on Vibelo!\nhttps://youtu.be/${song.audioUrl.split("://").last}'
+                                : '🎵 Listen to "${song.title}" by ${song.artist} on Vibelo!\n${song.audioUrl}';
+                            Share.share(shareText, subject: 'Check out this song');
+                          },
                         ),
                       ],
                     ),
@@ -332,26 +351,42 @@ class _PlayerScreenState extends State<PlayerScreen>
 
                     // Royalty-free badge
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
-                        color: VColors.secondary.withValues(alpha: 0.1),
+                        color: (song.audioUrl.startsWith('youtube')
+                                ? Colors.red
+                                : VColors.secondary)
+                            .withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                            color:
-                                VColors.secondary.withValues(alpha: 0.3)),
+                          color: (song.audioUrl.startsWith('youtube')
+                                  ? Colors.red
+                                  : VColors.secondary)
+                              .withValues(alpha: 0.3),
+                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.verified_rounded,
-                              color: VColors.secondary, size: 16),
+                          Icon(
+                            song.audioUrl.startsWith('youtube')
+                                ? Icons.smart_display_rounded
+                                : Icons.verified_rounded,
+                            color: song.audioUrl.startsWith('youtube')
+                                ? Colors.red
+                                : VColors.secondary,
+                            size: 16,
+                          ),
                           const SizedBox(width: 6),
                           Text(
-                            'Royalty-Free Music via Jamendo',
+                            song.audioUrl.startsWith('youtube')
+                                ? 'Audio via YouTube'
+                                : 'Royalty-Free Music via Jamendo',
                             style: GoogleFonts.poppins(
                               fontSize: 11,
-                              color: VColors.secondary,
+                              color: song.audioUrl.startsWith('youtube')
+                                  ? Colors.red.shade300
+                                  : VColors.secondary,
                             ),
                           ),
                         ],
@@ -362,6 +397,78 @@ class _PlayerScreenState extends State<PlayerScreen>
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddToPlaylistDialog(BuildContext context, String userId, SongModel song) {
+    final playlistProvider = context.read<PlaylistProvider>();
+    final playlists = playlistProvider.playlists;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: VColors.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Add to Playlist',
+                style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: VColors.textPri)),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.add_circle_outline_rounded,
+                  color: VColors.primary),
+              title: Text('Create New Playlist',
+                  style: GoogleFonts.poppins(
+                      color: VColors.primary, fontWeight: FontWeight.w600)),
+              onTap: () {
+                Navigator.pop(ctx); 
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => CreatePlaylistSheet(songToAdd: song),
+                );
+              },
+            ),
+            const Divider(height: 1, indent: 16, endIndent: 16),
+            if (playlists.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Text('No playlists yet. Create one above!',
+                    style: GoogleFonts.poppins(color: VColors.textSec)),
+              )
+            else
+              ...playlists.map((p) => ListTile(
+                    leading: Text(p['emoji'] ?? '🎵',
+                        style: const TextStyle(fontSize: 24)),
+                    title: Text(p['name'] ?? 'Playlist',
+                        style: GoogleFonts.poppins(color: VColors.textPri)),
+                    onTap: () async {
+                      await playlistProvider.addSongToPlaylist(p['id'], song);
+                      if (ctx.mounted) {
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Added to ${p['name']}',
+                                style: GoogleFonts.poppins()),
+                            backgroundColor: VColors.primary,
+                          ),
+                        );
+                      }
+                    },
+                  )),
+            const SizedBox(height: 16),
           ],
         ),
       ),

@@ -3,9 +3,12 @@ import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 import '../services/audio_handler.dart';
 import '../models/song_model.dart';
+import '../services/youtube_service.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 class PlayerProvider extends ChangeNotifier {
   final VibeleAudioHandler _handler;
+  final _yt = YoutubeExplode();
 
   SongModel? _currentSong;
   List<SongModel> _queue = [];
@@ -85,18 +88,30 @@ class PlayerProvider extends ChangeNotifier {
       _queueIndex = _queue.length - 1;
     }
 
-    final item = MediaItem(
-      id: song.audioUrl,
-      title: song.title,
-      artist: song.artist,
-      album: song.album,
-      artUri: Uri.tryParse(song.imageUrl),
-      duration: Duration(seconds: song.duration),
-    );
-
     // FIX: always clear isLoadingSong in finally so spinner never gets stuck
     try {
-      await _handler.playFromUrl(song.audioUrl, item);
+      // ── Resolve YouTube URL to real audio stream ──────────────
+      String audioUrl = song.audioUrl;
+      if (YouTubeService.isYouTubeUrl(audioUrl)) {
+        final videoId = YouTubeService.extractVideoId(audioUrl);
+        if (videoId != null) {
+          final manifest = await _yt.videos.streamsClient.getManifest(videoId);
+          // audioOnly gives you music without video — picks highest bitrate
+          audioUrl = manifest.audioOnly.withHighestBitrate().url.toString();
+        }
+      }
+      // ─────────────────────────────────────────────────────────
+
+      final item = MediaItem(
+        id: audioUrl,
+        title: song.title,
+        artist: song.artist,
+        album: song.album,
+        artUri: Uri.tryParse(song.imageUrl),
+        duration: Duration(seconds: song.duration),
+      );
+
+      await _handler.playFromUrl(audioUrl, item);
     } catch (e) {
       debugPrint('PlayerProvider.playSong error: $e');
     } finally {
@@ -191,5 +206,11 @@ class PlayerProvider extends ChangeNotifier {
     final m = remaining.inMinutes;
     final s = remaining.inSeconds % 60;
     return '${m}m ${s}s';
+  }
+
+  @override
+  void dispose() {
+    _yt.close(); // clean up
+    super.dispose();
   }
 }

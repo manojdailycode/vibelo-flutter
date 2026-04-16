@@ -24,6 +24,26 @@ class AudiusService {
     );
   }
 
+  // --- Search Albums & Artists (Placeholders) -----------------------------
+  Future<List<AlbumModel>> searchAlbums(String query, {int limit = 20}) async {
+    final url = '$_discovery/v1/playlists/search?query=${Uri.encodeComponent(query)}&limit=$limit&app_name=$_appName';
+    final res = await http.get(Uri.parse(url));
+    if (res.statusCode != 200) return [];
+    final data = json.decode(res.body);
+    final items = data['data'] as List? ?? [];
+    return items.map((item) => AlbumModel.fromAudius(item)).toList();
+  }
+
+  Future<List<ArtistModel>> searchArtists(String query, {int limit = 20}) async {
+    // Audius uses 'users' to represent artists
+    final url = '$_discovery/v1/users/search?query=${Uri.encodeComponent(query)}&limit=$limit&app_name=$_appName';
+    final res = await http.get(Uri.parse(url));
+    if (res.statusCode != 200) return [];
+    final data = json.decode(res.body);
+    final items = data['data'] as List? ?? [];
+    return items.map((item) => ArtistModel.fromAudius(item)).toList();
+  }
+
   // ── Trending ─────────────────────────────────────────────────────────────
   Future<List<SongModel>> getTrending({int limit = 20}) async {
     return _fetch(

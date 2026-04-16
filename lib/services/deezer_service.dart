@@ -16,6 +16,25 @@ class DeezerService {
     return _fetch('$_base/search?q=${Uri.encodeComponent(query)}&limit=$limit');
   }
 
+  // --- Search Albums & Artists (Placeholders) -----------------------------
+  Future<List<AlbumModel>> searchAlbums(String query, {int limit = 20}) async {
+    final url = '$_base/search/album?q=${Uri.encodeComponent(query)}&limit=$limit';
+    final res = await http.get(Uri.parse(url));
+    if (res.statusCode != 200) return [];
+    final data = json.decode(res.body);
+    final items = data['data'] as List? ?? [];
+    return items.map((item) => AlbumModel.fromDeezer(item)).toList();
+  }
+
+  Future<List<ArtistModel>> searchArtists(String query, {int limit = 20}) async {
+    final url = '$_base/search/artist?q=${Uri.encodeComponent(query)}&limit=$limit';
+    final res = await http.get(Uri.parse(url));
+    if (res.statusCode != 200) return [];
+    final data = json.decode(res.body);
+    final items = data['data'] as List? ?? [];
+    return items.map((item) => ArtistModel.fromDeezer(item)).toList();
+  }
+
   // ── Language shortcuts ───────────────────────────────────────────────────
   Future<List<SongModel>> getTeluguSongs({int limit = 25}) =>
       search('telugu songs', limit: limit);
