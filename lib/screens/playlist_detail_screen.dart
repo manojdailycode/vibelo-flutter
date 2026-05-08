@@ -85,7 +85,9 @@ class PlaylistDetailScreen extends StatelessWidget {
                     // Shuffle Button
                     IconButton(
                       onPressed: () {
-                        final playableSongs = songs.where((s) => !YouTubeService.isYouTubeUrl(s.audioUrl)).toList();
+                        final playableSongs = songs
+                            .where((s) => !YouTubeService.isYouTubeUrl(s.audioUrl ?? ''))
+                            .toList();
                         if (playableSongs.isNotEmpty) {
                           final shuffled = List<SongModel>.from(playableSongs)..shuffle();
                           context.read<PlayerProvider>().playSong(shuffled.first, queue: shuffled);
@@ -112,7 +114,9 @@ class PlaylistDetailScreen extends StatelessWidget {
                     // Play All Button
                     ElevatedButton.icon(
                       onPressed: () {
-                        final playableSongs = songs.where((s) => !YouTubeService.isYouTubeUrl(s.audioUrl)).toList();
+                        final playableSongs = songs
+                            .where((s) => !YouTubeService.isYouTubeUrl(s.audioUrl ?? ''))
+                            .toList();
                         if (playableSongs.isNotEmpty) {
                           context.read<PlayerProvider>().playSong(playableSongs.first, queue: playableSongs);
                           showModalBottomSheet(

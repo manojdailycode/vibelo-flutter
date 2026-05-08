@@ -7,6 +7,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../models/song_model.dart';
@@ -23,8 +24,7 @@ class YouTubeService {
   /// Searches YouTube for videos and returns them as a list of SongModels.
   Future<List<SongModel>> search(String query, {int limit = 20}) async {
     if (_apiKey.isEmpty) {
-      // ignore: avoid_print
-      print('YouTube API key is not set. Skipping YouTube search.');
+      debugPrint('YouTube search skipped: YOUTUBE_API_KEY is not set.');
       return [];
     }
     try {
@@ -37,7 +37,10 @@ class YouTubeService {
       });
 
       final res = await _httpClient.get(url);
-      if (res.statusCode != 200) return [];
+      if (res.statusCode != 200) {
+        debugPrint('YouTube search failed: HTTP ${res.statusCode} for "$query".');
+        return [];
+      }
 
       final data = json.decode(res.body);
       final items = data['items'] as List;
@@ -59,13 +62,17 @@ class YouTubeService {
         );
       }).toList();
     } catch (e) {
+      debugPrint('YouTube search exception for "$query": $e');
       return [];
     }
   }
 
   /// Fetches the most popular music videos for a given region.
   Future<List<SongModel>> getTrending({String regionCode = 'IN', int limit = 20}) async {
-    if (_apiKey.isEmpty) return [];
+    if (_apiKey.isEmpty) {
+      debugPrint('YouTube trending skipped: YOUTUBE_API_KEY is not set.');
+      return [];
+    }
     try {
       final url = Uri.https('www.googleapis.com', '/youtube/v3/videos', {
         'part': 'snippet,contentDetails',
@@ -76,7 +83,10 @@ class YouTubeService {
         'key': _apiKey,
       });
       final res = await _httpClient.get(url);
-      if (res.statusCode != 200) return [];
+      if (res.statusCode != 200) {
+        debugPrint('YouTube trending failed: HTTP ${res.statusCode} for region $regionCode.');
+        return [];
+      }
 
       final data = json.decode(res.body);
       final items = data['items'] as List;
@@ -96,6 +106,7 @@ class YouTubeService {
         );
       }).toList();
     } catch (e) {
+      debugPrint('YouTube trending exception for region $regionCode: $e');
       return [];
     }
   }

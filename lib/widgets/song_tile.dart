@@ -18,7 +18,7 @@ class SongTile extends StatelessWidget {
 
   const SongTile({super.key, required this.song, required this.songs});
 
-  bool get _isYouTube => YouTubeService.isYouTubeUrl(song.audioUrl);
+  bool get _isYouTube => YouTubeService.isYouTubeUrl(song.audioUrl ?? '');
 
   @override
   Widget build(BuildContext context) {
@@ -273,8 +273,8 @@ class SongTile extends StatelessWidget {
                 Navigator.pop(context);
                 final shareText = _isYouTube
                     ? '🎵 Watch "${song.title}" by ${song.artist} on YouTube!\n'
-                      'https://youtu.be/${YouTubeService.extractVideoId(song.audioUrl)}'
-                    : '🎵 Listen to "${song.title}" by ${song.artist} on Vibelo!\n${song.audioUrl}';
+                      'https://youtu.be/${YouTubeService.extractVideoId(song.audioUrl ?? '')}'
+                    : '🎵 Listen to "${song.title}" by ${song.artist} on Vibelo!\n${song.audioUrl ?? ''}';
                 Share.share(shareText, subject: 'Check out this song');
               },
             ),

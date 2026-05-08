@@ -1,13 +1,22 @@
 @echo off
 REM ─────────────────────────────────────────────────────────────────────────
 REM  build_release.bat  —  Build release APK with all API keys injected
+REM  Loads values from .env so secrets are not hardcoded in this file.
 REM ─────────────────────────────────────────────────────────────────────────
 
-set JAMENDO_CLIENT_ID=9649d556
-set JIOSAAVN_BASE_URL=https://patient-snowflake-d54b.manoj214330.workers.dev
-set YOUTUBE_API_KEY=AIzaSyBwjpX905WWG4vw9n_PhRuzXjGTvQOdb1c
-set SPOTIFY_CLIENT_ID=AIzaSyBwjpX905WWG4vw9n_PhRuzXjGTvQOdb1c
-set SPOTIFY_CLIENT_SECRET=30af9930e33f43c189d7b71ca9affa70
+if not exist .env (
+  echo ERROR: .env file not found. Copy .env.example to .env and fill values.
+  exit /b 1
+)
+
+for /f "usebackq tokens=1,* delims==" %%A in (".env") do (
+  if not "%%A"=="" if /i not "%%A:~0,1%%"=="#" set "%%A=%%B"
+)
+
+if "%JIOSAAVN_BASE_URL%"=="" (
+  echo ERROR: JIOSAAVN_BASE_URL is missing in .env
+  exit /b 1
+)
 
 flutter build apk --release ^
   --dart-define=JAMENDO_CLIENT_ID=%JAMENDO_CLIENT_ID% ^

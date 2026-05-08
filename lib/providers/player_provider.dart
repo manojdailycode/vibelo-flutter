@@ -8,26 +8,27 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 class PlayerProvider extends ChangeNotifier {
   final VibeleAudioHandler _handler;
-  final _yt = YoutubeExplode();
+
+  // FIX: create a single YoutubeExplode instance and reuse it.
+  // Creating a new instance per song leaks resources.
+  final YoutubeExplode _yt = YoutubeExplode();
 
   SongModel? _currentSong;
-  List<SongModel> _queue = [];
-  int _queueIndex = 0;
+  List<SongModel> _queue    = [];
+  int _queueIndex           = 0;
 
-  bool _isPlaying = false;
-  bool _isShuffled = false;
-  bool _isLooping = false;
-
-  // FIX: separate "loading a new song" from "buffering"
-  bool _isLoadingSong = false; // true only while calling playSong()
-  bool _isBuffering = false;   // true while audio engine is buffering
+  bool _isPlaying           = false;
+  bool _isShuffled          = false;
+  bool _isLooping           = false;
+  bool _isLoadingSong       = false;
+  bool _isBuffering         = false;
   String? _playbackError;
+  String _selectedQuality = 'high';
 
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
 
-  // Sleep timer
-  int _sleepMinutes = 0;
+  int _sleepMinutes     = 0;
   DateTime? _sleepTime;
 
   PlayerProvider(this._handler) {
@@ -46,7 +47,6 @@ class PlayerProvider extends ChangeNotifier {
       notifyListeners();
     });
 
-    // FIX: track buffering state from the audio engine
     _handler.player.processingStateStream.listen((state) {
       _isBuffering = state == ProcessingState.loading ||
           state == ProcessingState.buffering;
@@ -54,22 +54,27 @@ class PlayerProvider extends ChangeNotifier {
     });
   }
 
-  SongModel? get currentSong => _currentSong;
-  List<SongModel> get queue => _queue;
-  int get queueIndex => _queueIndex;
-  bool get isPlaying => _isPlaying;
-  bool get isShuffled => _isShuffled;
-  bool get isLooping => _isLooping;
+  SongModel?        get currentSong    => _currentSong;
+  List<SongModel>   get queue          => _queue;
+  int               get queueIndex     => _queueIndex;
+  bool              get isPlaying      => _isPlaying;
+  bool              get isShuffled     => _isShuffled;
+  bool              get isLooping      => _isLooping;
+  bool              get isLoading      => _isLoadingSong || _isBuffering;
+  bool              get hasSong        => _currentSong != null;
+  Duration          get position       => _position;
+  Duration          get duration       => _duration;
+  int               get sleepMinutes   => _sleepMinutes;
+  bool              get hasError       => _playbackError != null;
+  String?           get playbackError  => _playbackError;
+  String            get selectedQuality => _selectedQuality;
 
-  /// Show spinner only while loading a new song OR while buffering.
-  /// Once playing, both become false and the play/pause icon shows correctly.
-  bool get isLoading => _isLoadingSong || _isBuffering;
-
-  bool get hasSong => _currentSong != null;
-  Duration get position => _position;
-  Duration get duration => _duration;
-  int get sleepMinutes => _sleepMinutes;
-  bool get hasError => _playbackError != null;
+  static const Map<String, String> _qualityKeyByLabel = {
+    'Low': 'basic',
+    'Normal': 'normal',
+    'High': 'high',
+    'Ultra HD': 'ultra_hd',
+  };
 
   void clearError() {
     _playbackError = null;
@@ -81,51 +86,150 @@ class PlayerProvider extends ChangeNotifier {
     return (_position.inSeconds / _duration.inSeconds).clamp(0.0, 1.0);
   }
 
-  // ── Play a song ──────────────────────────────────
+  // ── Play a song ─────────────────────────────────────────────────────────
   Future<void> playSong(SongModel song, {List<SongModel>? queue}) async {
-    _isLoadingSong = true;
+    _isLoadingSong  = true;
+    _playbackError  = null;
     notifyListeners();
 
     _currentSong = song;
     if (queue != null) {
-      _queue = queue;
+      _queue      = queue;
       _queueIndex = queue.indexWhere((s) => s.id == song.id);
+      if (_queueIndex < 0) _queueIndex = 0;
     } else if (!_queue.any((s) => s.id == song.id)) {
       _queue.add(song);
       _queueIndex = _queue.length - 1;
     }
 
-    // FIX: always clear isLoadingSong in finally so spinner never gets stuck
     try {
-      // ── Resolve YouTube URL to real audio stream ──────────────
-      String audioUrl = song.audioUrl;
+      if (song.audioUrl == null || song.audioUrl!.isEmpty) {
+        _playbackError = 'Audio unavailable for this song.';
+        return;
+      }
+
+      String audioUrl = song.audioUrl!;
+
+      // ── Resolve YouTube → real audio stream URL ──────────────────────────
       if (YouTubeService.isYouTubeUrl(audioUrl)) {
         final videoId = YouTubeService.extractVideoId(audioUrl);
-        if (videoId != null) {
-          final manifest = await _yt.videos.streamsClient.getManifest(videoId);
-          // audioOnly gives you music without video — picks highest bitrate
-          audioUrl = manifest.audioOnly.withHighestBitrate().url.toString();
+        if (videoId == null || videoId.isEmpty) {
+          throw Exception('Could not extract YouTube video ID from: $audioUrl');
+        }
+
+        debugPrint('PlayerProvider: resolving YouTube stream for $videoId');
+
+        // youtube_explode_dart does NOT need a v3 API key — it scrapes YouTube
+        // directly, so playback works even when the Data API quota is exhausted.
+        StreamManifest manifest;
+        try {
+          manifest = await _yt.videos.streamsClient
+              .getManifest(videoId)
+              .timeout(const Duration(seconds: 20));
+        } catch (e) {
+          throw Exception(
+              'YouTube stream fetch failed for $videoId — '
+              'check your internet connection. ($e)');
+        }
+
+        final audioStreams = manifest.audioOnly;
+        if (audioStreams.isEmpty) {
+          throw Exception('No audio-only stream found for YouTube video $videoId');
+        }
+
+        // Some YouTube CDN URLs return 403 on specific devices/networks.
+        // Try multiple audio-only variants from high->low bitrate.
+        final sorted = audioStreams.toList()
+          ..sort((a, b) => b.bitrate.bitsPerSecond.compareTo(a.bitrate.bitsPerSecond));
+
+        Object? lastError;
+        bool started = false;
+
+        for (final stream in sorted.take(6)) {
+          final candidateUrl = stream.url.toString();
+          try {
+            final item = MediaItem(
+              id:       candidateUrl,
+              title:    song.title,
+              artist:   song.artist,
+              album:    song.album,
+              artUri:   Uri.tryParse(song.imageUrl),
+              duration: Duration(seconds: song.duration),
+            );
+
+            await _handler.playFromUrl(candidateUrl, item);
+            audioUrl = candidateUrl;
+            started = true;
+            debugPrint('PlayerProvider: resolved and started → $audioUrl');
+            break;
+          } catch (e) {
+            lastError = e;
+            debugPrint('PlayerProvider: stream candidate failed → $e');
+          }
+        }
+
+        if (!started) {
+          throw Exception('YouTube streams blocked/expired for $videoId. Last error: $lastError');
         }
       }
-      // ─────────────────────────────────────────────────────────
+      // ─────────────────────────────────────────────────────────────────────
 
+      // If the source is not YouTube (or YouTube was not pre-started above),
+      // play via normal path using backend-provided audioUrl.
+      if (!YouTubeService.isYouTubeUrl(song.audioUrl ?? '')) {
       final item = MediaItem(
-        id: audioUrl,
-        title: song.title,
-        artist: song.artist,
-        album: song.album,
-        artUri: Uri.tryParse(song.imageUrl),
+        id:       audioUrl,
+        title:    song.title,
+        artist:   song.artist,
+        album:    song.album,
+        artUri:   Uri.tryParse(song.imageUrl),
         duration: Duration(seconds: song.duration),
       );
 
       await _handler.playFromUrl(audioUrl, item);
+      }
     } catch (e) {
       _playbackError = e.toString();
-      debugPrint('PlayerProvider.playSong error: $e');
+      debugPrint('PlayerProvider.playSong ERROR: $e');
     } finally {
+      // FIX: always clear the loading flag — prevents the spinner sticking.
       _isLoadingSong = false;
       notifyListeners();
     }
+  }
+
+  Future<void> setAudioQualityLabel(String label) async {
+    final key = _qualityKeyByLabel[label];
+    if (key == null) return;
+    _selectedQuality = key;
+    notifyListeners();
+
+    final song = _currentSong;
+    if (song == null) return;
+    final nextUrl = _resolveQualityUrl(song);
+    if (nextUrl == null || nextUrl.isEmpty) return;
+
+    final item = MediaItem(
+      id: nextUrl,
+      title: song.title,
+      artist: song.artist,
+      album: song.album,
+      artUri: Uri.tryParse(song.imageUrl),
+      duration: Duration(seconds: song.duration),
+    );
+
+    await _handler.playFromUrl(nextUrl, item);
+  }
+
+  String? _resolveQualityUrl(SongModel song) {
+    final q = song.audioQualities;
+    if (q == null) return song.audioUrl;
+
+    String? read(String key) => (q[key] is Map)
+        ? (q[key]['url']?.toString())
+        : null;
+
+    return read(_selectedQuality) ?? song.audioUrl;
   }
 
   Future<void> togglePlayPause() async {
@@ -142,9 +246,8 @@ class PlayerProvider extends ChangeNotifier {
 
   Future<void> seekToProgress(double progress) async {
     if (_duration.inSeconds > 0) {
-      await _handler.seek(
-        Duration(seconds: (progress * _duration.inSeconds).round()),
-      );
+      await _handler
+          .seek(Duration(seconds: (progress * _duration.inSeconds).round()));
     }
   }
 
@@ -167,7 +270,9 @@ class PlayerProvider extends ChangeNotifier {
   Future<void> toggleShuffle() async {
     _isShuffled = !_isShuffled;
     await _handler.setShuffleMode(
-      _isShuffled ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none,
+      _isShuffled
+          ? AudioServiceShuffleMode.all
+          : AudioServiceShuffleMode.none,
     );
     notifyListeners();
   }
@@ -190,15 +295,16 @@ class PlayerProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── Sleep Timer ──────────────────────────────────
+  // ── Sleep Timer ──────────────────────────────────────────────────────────
   void setSleepTimer(int minutes) {
     _sleepMinutes = minutes;
     if (minutes > 0) {
-      _sleepTime = DateTime.now().add(Duration(minutes: minutes));
+      _sleepTime =
+          DateTime.now().add(Duration(minutes: minutes));
       Future.delayed(Duration(minutes: minutes), () {
         _handler.pause();
         _sleepMinutes = 0;
-        _sleepTime = null;
+        _sleepTime    = null;
         notifyListeners();
       });
     } else {
@@ -218,7 +324,7 @@ class PlayerProvider extends ChangeNotifier {
 
   @override
   void dispose() {
-    _yt.close(); // clean up
+    _yt.close();
     super.dispose();
   }
 }

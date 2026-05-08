@@ -25,9 +25,14 @@ class VibeleAudioHandler extends BaseAudioHandler
   AudioPlayer get player => _player;
 
   // ── Play from URL ────────────────────────────────
-  Future<void> playFromUrl(String url, MediaItem item) async {
+  Future<void> playFromUrl(
+    String url,
+    MediaItem item,
+  ) async {
     mediaItem.add(item);
-    await _player.setAudioSource(AudioSource.uri(Uri.parse(url)));
+    await _player.setAudioSource(
+      AudioSource.uri(Uri.parse(url)),
+    );
     await _player.play();
   }
 

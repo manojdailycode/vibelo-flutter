@@ -8,6 +8,10 @@ class MusicProvider extends ChangeNotifier {
   final _manager = MusicSourceManager.instance;
   final _jiosaavn = JioSaavnService();
 
+  void _log(String message) {
+    if (kDebugMode) debugPrint(message);
+  }
+
   List<SongModel> _trending   = [];
   List<SongModel> _newRelease = [];
   List<SongModel> _searchResults = [];
@@ -19,6 +23,7 @@ class MusicProvider extends ChangeNotifier {
   bool _loadingGenre      = false;
   String? _searchQuery;
   String? _searchError;
+  String? _jioLastError;
   Timer? _debounce;
 
   List<SongModel> get trending      => _trending;
@@ -32,6 +37,7 @@ class MusicProvider extends ChangeNotifier {
   bool get loadingGenre    => _loadingGenre;
   String? get searchQuery  => _searchQuery;
   String? get searchError  => _searchError;
+  String? get jioLastError => _jioLastError;
 
   // ── Load home data — pulls from ALL sources via MusicSourceManager ───────
   Future<void> loadHomeData() async {
@@ -43,14 +49,16 @@ class MusicProvider extends ChangeNotifier {
       final home = await _manager.loadHomeData();
       _trending   = home.trending;
       _newRelease = home.newReleases;
+      _log('[MusicProvider] loadHomeData success trending=${_trending.length} newReleases=${_newRelease.length}');
     } catch (e) {
-      debugPrint('MusicSourceManager.loadHomeData failed, falling back: $e');
+      _log('MusicSourceManager.loadHomeData failed, falling back: $e');
       final results = await Future.wait([
         _jiosaavn.searchSongs('trending songs india', limit: 20),
         _jiosaavn.searchSongs('new releases', limit: 20),
       ]);
       _trending   = results[0];
       _newRelease = results[1];
+      _log('[MusicProvider] fallback loadHomeData trending=${_trending.length} newReleases=${_newRelease.length}');
     }
 
     _loadingTrending = false;
@@ -82,11 +90,25 @@ class MusicProvider extends ChangeNotifier {
     try {
       final results = await _manager.searchAll(query, limitPerType: 30);
       _searchResults = results.songs;
+      _jioLastError = _jiosaavn.lastErrorMessage;
+
+      if (_searchResults.isEmpty && !_jiosaavn.lastRequestFailed) {
+        _searchError = 'No JioSaavn results found for "$query" yet.';
+      } else if (_searchResults.isEmpty && _jiosaavn.lastRequestFailed) {
+        _searchError = 'JioSaavn error: ${_jiosaavn.lastErrorMessage ?? 'unknown issue'}';
+      }
+
+      _log('[MusicProvider] search success query="$query" songs=${_searchResults.length}');
     } catch (e) {
-      debugPrint('MusicSourceManager.search failed, falling back: $e');
+      _log('MusicSourceManager.search failed, falling back: $e');
       _searchResults = await _jiosaavn.searchSongs(query, limit: 30);
+      _jioLastError = _jiosaavn.lastErrorMessage;
+      _log('[MusicProvider] fallback search query="$query" songs=${_searchResults.length}');
       if (_searchResults.isEmpty) {
-        _searchError = 'Unable to search right now. Please check your connection.';
+        _searchError = _jiosaavn.lastRequestFailed
+            ? 'JioSaavn request failed: ${_jiosaavn.lastErrorMessage ?? 'unknown error'}'
+            : 'No songs found.';
+        _log('[MusicProvider] searchError=$_searchError');
       }
     }
 
@@ -99,6 +121,7 @@ class MusicProvider extends ChangeNotifier {
     _debounce?.cancel();
     _searchQuery = null;
     _searchError = null;
+    _jioLastError = null;
     notifyListeners();
   }
 
@@ -123,11 +146,14 @@ class MusicProvider extends ChangeNotifier {
   Future<List<SongModel>> getSongsByGenre(String genre, {int limit = 40}) async {
     if (genre.trim().isEmpty) return [];
     final results = await _jiosaavn.searchSongs(genre, limit: limit);
+    _log('[MusicProvider] getSongsByGenre genre="$genre" songs=${results.length}');
     return results;
   }
 
   // ── Mood — JioSaavn-backed mood search ──────────────────────────────────
   Future<List<SongModel>> getMoodSongs(String mood) async {
-    return _jiosaavn.searchSongs(mood, limit: 40);
+    final results = await _jiosaavn.searchSongs(mood, limit: 40);
+    _log('[MusicProvider] getMoodSongs mood="$mood" songs=${results.length}');
+    return results;
   }
 }

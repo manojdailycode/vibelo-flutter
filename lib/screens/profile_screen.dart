@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../theme/app_theme.dart';
 import '../providers/auth_provider.dart';
+import '../providers/player_provider.dart';
 import '../services/auth_service.dart';
 import 'auth/login_screen.dart';
 
@@ -575,6 +576,7 @@ class ProfileScreen extends StatelessWidget {
 
   // ── Audio Quality picker ─────────────────────────────────────────────────
   void _showAudioQualityPicker(BuildContext context) {
+    final player = context.read<PlayerProvider>();
     String selected = 'High';
     final options = [
       {'label': 'Low', 'sub': '64 kbps · Saves data', 'icon': Icons.signal_cellular_alt_1_bar},
@@ -613,7 +615,11 @@ class ProfileScreen extends StatelessWidget {
               ...options.map((o) {
                 final isSelected = selected == o['label'];
                 return GestureDetector(
-                  onTap: () => setState(() => selected = o['label'] as String),
+                  onTap: () async {
+                    final label = o['label'] as String;
+                    setState(() => selected = label);
+                    await player.setAudioQualityLabel(label);
+                  },
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 10),
                     padding: const EdgeInsets.all(14),

@@ -1,6 +1,6 @@
 package com.vibelo.app
 
-import io.flutter.embedding.android.FlutterFragmentActivity
+import com.ryanheise.audioservice.AudioServiceActivity
 
-class MainActivity : FlutterFragmentActivity() {
+class MainActivity : AudioServiceActivity() {
 }

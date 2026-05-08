@@ -3,7 +3,10 @@ class SongModel {
   final String title;
   final String artist;
   final String album;
-  final String audioUrl;
+  final String? audioUrl;
+  final String? audioUrlDirect;
+  final Map<String, dynamic>? audioQualities;
+  final bool hasFullAudio;
   final String imageUrl;
   final int duration; // seconds
   final String genre;
@@ -19,6 +22,9 @@ class SongModel {
     required this.artist,
     required this.album,
     required this.audioUrl,
+    this.audioUrlDirect,
+    this.audioQualities,
+    this.hasFullAudio = false,
     required this.imageUrl,
     required this.duration,
     this.genre = '',
@@ -41,7 +47,7 @@ class SongModel {
       title: json['name'] ?? 'Unknown Title',
       artist: json['artist_name'] ?? 'Unknown Artist',
       album: json['album_name'] ?? 'Unknown Album',
-      audioUrl: json['audio'] ?? '',
+      audioUrl: json['audio']?.toString(),
       imageUrl: json['album_image'] ?? json['image'] ?? '',
       duration: int.tryParse(json['duration']?.toString() ?? '0') ?? 0,
       genre: (json['musicinfo']?['tags']?['genres'] as List?)
@@ -50,22 +56,173 @@ class SongModel {
     );
   }
 
+  factory SongModel.fromJson(Map<String, dynamic> json) {
+    return SongModel(
+      id: json['id']?.toString() ?? '',
+      title: json['name'] ?? json['title'] ?? 'Unknown Title',
+      artist: json['artist']?.toString() ?? 'Unknown Artist',
+      album: json['album']?.toString() ?? 'Unknown Album',
+      audioUrl: json['audioUrl']?.toString(),
+      audioUrlDirect: json['audioUrlDirect']?.toString(),
+      audioQualities: json['audioQualities'] is Map<String, dynamic>
+          ? json['audioQualities'] as Map<String, dynamic>
+          : null,
+      hasFullAudio: json['hasFullAudio'] ?? false,
+      imageUrl: json['imageUrl']?.toString() ?? '',
+      duration: int.tryParse(json['duration']?.toString() ?? '0') ?? 0,
+      source: json['source']?.toString() ?? '',
+      genre: json['genre']?.toString() ?? '',
+      sourceUrl: json['sourceUrl']?.toString() ?? '',
+      isPremium: json['isPremium'] ?? false,
+      isLiked: json['isLiked'] ?? false,
+      isDownloaded: json['isDownloaded'] ?? false,
+    );
+  }
+
   factory SongModel.fromJioSaavn(Map<String, dynamic> json) {
-    // Helper to get the highest quality URL from a list of links
-    String getBestUrl(dynamic urls) {
-      if (urls is List && urls.isNotEmpty) {
-        return (urls.last['link'] ?? '').toString();
+    String getImageUrl(Map<String, dynamic> map) {
+      String getBestUrl(dynamic urls) {
+        if (urls is String) {
+          return urls.startsWith('http') ? urls : '';
+        }
+
+        if (urls is Map) {
+          final direct = (urls['link'] ?? urls['url'] ?? '').toString();
+          return direct.startsWith('http') ? direct : '';
+        }
+
+        if (urls is List && urls.isNotEmpty) {
+          final links = urls
+              .map((e) => (e is Map ? (e['link'] ?? '') : '').toString())
+              .where((u) => u.startsWith('http'))
+              .toList();
+          if (links.isEmpty) return '';
+          return links.last;
+        }
+        return '';
       }
-      return (urls is String) ? urls : '';
+      final direct = (map['imageUrl'] ?? '').toString();
+      if (direct.startsWith('http')) return direct;
+      return getBestUrl(map['image']);
     }
+
+    String readAlbum(dynamic album) {
+      if (album is String) return album;
+      if (album is Map) {
+        return (album['name'] ?? album['title'] ?? 'Unknown Album').toString();
+      }
+      return 'Unknown Album';
+    }
+
+    String readArtists(dynamic artists) {
+      if (artists is String) return artists;
+      if (artists is List) {
+        final names = artists
+            .map((e) {
+              if (e is String) return e;
+              if (e is Map) return (e['name'] ?? e['title'] ?? '').toString();
+              return '';
+            })
+            .where((e) => e.trim().isNotEmpty)
+            .toList();
+        if (names.isNotEmpty) return names.join(', ');
+      }
+      if (artists is Map) {
+        return (artists['name'] ?? artists['title'] ?? 'Unknown Artist').toString();
+      }
+      return 'Unknown Artist';
+    }
+
+    String? readAudioUrl(dynamic audioUrl, dynamic downloadUrl) {
+      bool ok(String? u) => u != null && u.startsWith('http');
+
+      if (audioUrl is String && ok(audioUrl)) return audioUrl;
+
+      if (audioUrl is Map) {
+        for (final key in ['url', 'link', 'high', '320kbps', '320', '160']) {
+          final v = audioUrl[key]?.toString();
+          if (ok(v)) return v;
+        }
+      }
+
+      if (audioUrl is List) {
+        final links = audioUrl
+            .map((e) => (e is Map ? (e['link'] ?? e['url'] ?? '') : e).toString())
+            .where((u) => u.startsWith('http'))
+            .toList();
+        if (links.isNotEmpty) return links.last;
+      }
+
+      if (downloadUrl is List) {
+        final ranked = <int, String>{};
+        for (final e in downloadUrl) {
+          if (e is! Map) continue;
+          final quality = int.tryParse((e['quality'] ?? '0').toString()) ?? 0;
+          final link = (e['link'] ?? e['url'] ?? '').toString();
+          if (link.startsWith('http')) ranked[quality] = link;
+        }
+        if (ranked.isNotEmpty) {
+          final best = ranked.keys.reduce((a, b) => a > b ? a : b);
+          return ranked[best];
+        }
+      }
+
+      if (downloadUrl is Map) {
+        final values = [
+          downloadUrl['320kbps'],
+          downloadUrl['320'],
+          downloadUrl['160kbps'],
+          downloadUrl['160'],
+          downloadUrl['url'],
+          downloadUrl['link'],
+        ].map((e) => e?.toString()).toList();
+
+        for (final v in values) {
+          if (ok(v)) return v;
+        }
+      }
+
+      if (downloadUrl is String && ok(downloadUrl)) return downloadUrl;
+
+      return null;
+    }
+
+    Map<String, dynamic>? readAudioQualities(dynamic downloadUrl) {
+      if (downloadUrl is! List) return null;
+
+      final out = <String, dynamic>{};
+      for (final e in downloadUrl) {
+        if (e is! Map) continue;
+        final q = (e['quality'] ?? '').toString();
+        final link = (e['link'] ?? e['url'] ?? '').toString();
+        if (!link.startsWith('http')) continue;
+
+        if (q == '48') out['basic'] = {'url': link};
+        if (q == '96') out['normal'] = {'url': link};
+        if (q == '160') out['high'] = {'url': link};
+        if (q == '320') out['ultra_hd'] = {'url': link};
+      }
+      return out.isEmpty ? null : out;
+    }
+
+    final resolvedAudioUrl = readAudioUrl(json['audioUrl'], json['downloadUrl']);
+    final resolvedQualities =
+        (json['audioQualities'] is Map<String, dynamic>)
+            ? json['audioQualities'] as Map<String, dynamic>
+            : readAudioQualities(json['downloadUrl']);
 
     return SongModel(
       id: 'jiosaavn_${json['id'] ?? ''}',
       title: json['name'] ?? json['title'] ?? 'Unknown Title',
-      artist: json['primaryArtists'] ?? 'Unknown Artist',
-      album: json['album']?['name'] ?? 'Unknown Album',
-      audioUrl: getBestUrl(json['downloadUrl']),
-      imageUrl: getBestUrl(json['image']),
+      artist: json['artist']?.toString().trim().isNotEmpty == true
+          ? json['artist'].toString()
+          : readArtists(json['primaryArtists']),
+      album: readAlbum(json['album']),
+      audioUrl: resolvedAudioUrl,
+      audioUrlDirect: json['audioUrlDirect']?.toString(),
+      audioQualities: resolvedQualities,
+      hasFullAudio: json['hasFullAudio'] ?? false,
+      imageUrl: getImageUrl(json),
       duration: int.tryParse(json['duration']?.toString() ?? '0') ?? 0,
       source: 'JioSaavn',
       sourceUrl: json['url'] ?? '',
@@ -73,20 +230,7 @@ class SongModel {
   }
 
   factory SongModel.fromMap(Map<String, dynamic> map) {
-    return SongModel(
-      id: map['id'] ?? '',
-      title: map['title'] ?? 'Unknown Title',
-      artist: map['artist'] ?? 'Unknown Artist',
-      album: map['album'] ?? '',
-      audioUrl: map['audioUrl'] ?? '',
-      imageUrl: map['imageUrl'] ?? '',
-      duration: map['duration'] ?? 0,
-      source: map['source'] ?? '',
-      genre: map['genre'] ?? '',
-      sourceUrl: map['sourceUrl'] ?? '',
-      isPremium: map['isPremium'] ?? false,
-      isLiked: map['isLiked'] ?? false,
-    );
+    return SongModel.fromJson(map);
   }
 
   Map<String, dynamic> toMap() {
@@ -96,6 +240,9 @@ class SongModel {
       'artist': artist,
       'album': album,
       'audioUrl': audioUrl,
+      'audioUrlDirect': audioUrlDirect,
+      'audioQualities': audioQualities,
+      'hasFullAudio': hasFullAudio,
       'imageUrl': imageUrl,
       'duration': duration,
       'genre': genre,
@@ -113,6 +260,9 @@ class SongModel {
       artist: artist,
       album: album,
       audioUrl: audioUrl,
+      audioUrlDirect: audioUrlDirect,
+      audioQualities: audioQualities,
+      hasFullAudio: hasFullAudio,
       imageUrl: imageUrl,
       duration: duration,
       genre: genre,
@@ -146,8 +296,20 @@ class AlbumModel {
 
   factory AlbumModel.fromJioSaavn(Map<String, dynamic> json) {
     String getBestUrl(dynamic urls) {
-      if (urls is List && urls.isNotEmpty) return (urls.last['link'] ?? '').toString();
-      return (urls is String) ? urls : '';
+      if (urls is String) return urls.startsWith('http') ? urls : '';
+      if (urls is Map) {
+        final u = (urls['link'] ?? urls['url'] ?? '').toString();
+        return u.startsWith('http') ? u : '';
+      }
+      if (urls is List && urls.isNotEmpty) {
+        final links = urls
+            .map((e) => (e is Map ? (e['link'] ?? e['url'] ?? '') : e).toString())
+            .where((u) => u.startsWith('http'))
+            .toList();
+        if (links.isEmpty) return '';
+        return links.last;
+      }
+      return '';
     }
 
     return AlbumModel(
@@ -220,8 +382,20 @@ class ArtistModel {
 
   factory ArtistModel.fromJioSaavn(Map<String, dynamic> json) {
     String getBestUrl(dynamic urls) {
-      if (urls is List && urls.isNotEmpty) return (urls.last['link'] ?? '').toString();
-      return (urls is String) ? urls : '';
+      if (urls is String) return urls.startsWith('http') ? urls : '';
+      if (urls is Map) {
+        final u = (urls['link'] ?? urls['url'] ?? '').toString();
+        return u.startsWith('http') ? u : '';
+      }
+      if (urls is List && urls.isNotEmpty) {
+        final links = urls
+            .map((e) => (e is Map ? (e['link'] ?? e['url'] ?? '') : e).toString())
+            .where((u) => u.startsWith('http'))
+            .toList();
+        if (links.isEmpty) return '';
+        return links.last;
+      }
+      return '';
     }
 
     return ArtistModel(

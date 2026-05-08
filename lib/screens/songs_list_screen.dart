@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
@@ -21,6 +22,10 @@ class SongsListScreen extends StatelessWidget {
     this.subtitle = '',
     this.emoji,
   });
+
+  void _log(String message) {
+    if (kDebugMode) debugPrint(message);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,12 +57,52 @@ class SongsListScreen extends StatelessWidget {
       body: FutureBuilder<List<SongModel>>(
         future: loader(),
         builder: (context, snap) {
+          _log('[SongsListScreen:$title] connectionState=${snap.connectionState}');
+          _log('[SongsListScreen:$title] hasData=${snap.hasData} hasError=${snap.hasError}');
+          _log('[SongsListScreen:$title] snapshot.data.length=${snap.data?.length ?? -1}');
+          if (snap.error != null) {
+            _log('[SongsListScreen:$title] snapshot.error=${snap.error}');
+          }
+
           if (snap.connectionState == ConnectionState.waiting) {
             return const Center(
               child: CircularProgressIndicator(color: VColors.primary),
             );
           }
-          if (snap.hasError || !snap.hasData || snap.data!.isEmpty) {
+
+          if (snap.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline_rounded,
+                        color: Colors.redAccent, size: 54),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Failed to load songs',
+                      style: GoogleFonts.poppins(
+                        color: VColors.textPri,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${snap.error}',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.poppins(
+                        color: VColors.textSec,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          if (!snap.hasData || snap.data == null || snap.data!.isEmpty) {
             return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -133,8 +178,13 @@ class SongsListScreen extends StatelessWidget {
                 child: ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   itemCount: songs.length,
-                  itemBuilder: (_, i) =>
-                      SongTile(song: songs[i], songs: songs),
+                  itemBuilder: (_, i) {
+                    final s = songs[i];
+                    _log(
+                      '[SongsListScreen:$title] itemBuilder index=$i id=${s.id} title=${s.title} artist=${s.artist} audioUrl=${s.audioUrl} imageUrl=${s.imageUrl}',
+                    );
+                    return SongTile(song: s, songs: songs);
+                  },
                 ),
               ),
             ],

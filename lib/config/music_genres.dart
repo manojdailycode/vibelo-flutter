@@ -12,6 +12,49 @@ class MusicGenres {
     {'tag': 'devotional', 'name': 'Devotional', 'emoji': '🙏'},
   ];
 
+  // FIX: home_screen._MoodGrid reads 'label', 'emoji', and 'color' (as int).
+  // The old moods map used 'name' (not 'label') and had no 'color' key → crash.
+  // Now using Map<String, dynamic> so the int color value can be stored.
+  static const List<Map<String, dynamic>> moodTiles = [
+    {
+      'tag': 'happy',
+      'label': 'Happy',
+      'emoji': '😊',
+      'color': 0xFF48BB78, // green
+    },
+    {
+      'tag': 'chill',
+      'label': 'Chill',
+      'emoji': '😌',
+      'color': 0xFF4A90D9, // blue
+    },
+    {
+      'tag': 'energy',
+      'label': 'Energy',
+      'emoji': '⚡',
+      'color': 0xFFFFB830, // amber
+    },
+    {
+      'tag': 'sad',
+      'label': 'Sad',
+      'emoji': '😢',
+      'color': 0xFF7B5EA7, // violet
+    },
+    {
+      'tag': 'romance',
+      'label': 'Romance',
+      'emoji': '💕',
+      'color': 0xFFFF6B9D, // pink
+    },
+    {
+      'tag': 'party',
+      'label': 'Party',
+      'emoji': '🎉',
+      'color': 0xFFFC8181, // red
+    },
+  ];
+
+  // Keep the old moods list as a plain String map for any other usages.
   static const List<Map<String, String>> moods = [
     {'tag': 'happy', 'name': 'Happy', 'emoji': '😊'},
     {'tag': 'chill', 'name': 'Chill', 'emoji': '😌'},
@@ -20,6 +63,4 @@ class MusicGenres {
     {'tag': 'romance', 'name': 'Romance', 'emoji': '💕'},
     {'tag': 'party', 'name': 'Party', 'emoji': '🎉'},
   ];
-
-  static const List<Map<String, String>> moodTiles = moods;
 }

@@ -14,7 +14,7 @@ import 'screens/splash_screen.dart';
 
 late VibeleAudioHandler audioHandler;
 
-/// Initializes all services in the background after UI loads
+/// Initializes remaining services in the background after UI loads
 Future<void> _initializeServices() async {
   // Firebase initialization
   try {
@@ -24,22 +24,7 @@ Future<void> _initializeServices() async {
     debugPrint('✗ Firebase init failed: $e');
   }
 
-  // Audio service initialization
-  try {
-    audioHandler = await AudioService.init(
-      builder: () => VibeleAudioHandler(),
-      config: const AudioServiceConfig(
-        androidNotificationChannelId: 'com.vibelo.app.audio',
-        androidNotificationChannelName: 'Vibelo Music',
-        androidNotificationOngoing: true,
-        androidStopForegroundOnPause: true,
-      ),
-    );
-    debugPrint('✓ AudioService initialized');
-  } catch (e) {
-    debugPrint('✗ AudioService init failed: $e');
-    audioHandler = VibeleAudioHandler();
-  }
+  // Audio service is already initialized in main() before runApp.
 }
 
 Future<void> main() async {
@@ -61,13 +46,28 @@ Future<void> main() async {
     ),
   );
 
-  // Initialize a dummy audio handler for instant UI load
-  audioHandler = VibeleAudioHandler();
+  // Initialize audio handler once before provider wiring.
+  // This prevents PlayerProvider from holding a stale dummy handler.
+  try {
+    audioHandler = await AudioService.init(
+      builder: () => VibeleAudioHandler(),
+      config: const AudioServiceConfig(
+        androidNotificationChannelId: 'com.vibelo.app.audio',
+        androidNotificationChannelName: 'Vibelo Music',
+        androidNotificationOngoing: true,
+        androidStopForegroundOnPause: true,
+      ),
+    );
+    debugPrint('✓ AudioService initialized (pre-runApp)');
+  } catch (e) {
+    debugPrint('✗ AudioService init failed (pre-runApp): $e');
+    audioHandler = VibeleAudioHandler();
+  }
 
-  // Run app immediately — no blocking!
+  // Run app after stable handler is ready.
   runApp(const VibeleApp());
 
-  // Initialize services in the background (app already showing)
+  // Initialize remaining services in the background (app already showing)
   await _initializeServices();
 }
 
