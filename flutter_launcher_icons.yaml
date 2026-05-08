@@ -1,0 +1,21 @@
+# flutter_launcher_icons.yaml
+# Place this file in your project ROOT (same level as pubspec.yaml)
+# Run: dart run flutter_launcher_icons
+
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  image_path: "assets/icons/app_icon.png"
+  
+  # Android adaptive icon (Android 8.0+)
+  adaptive_icon_background: "#0D1117"
+  adaptive_icon_foreground: "assets/icons/app_icon.png"
+  
+  # Android settings
+  min_sdk_android: 21
+  
+  # Remove old icons
+  remove_alpha_ios: false
+  
+  web:
+    generate: false

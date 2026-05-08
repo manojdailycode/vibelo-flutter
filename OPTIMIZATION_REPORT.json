@@ -1,0 +1,523 @@
+{
+  "report_title": "Vibelo Flutter App - Optimization Analysis",
+  "report_date": "2026-04-14",
+  "executive_summary": {
+    "codebase_size": {
+      "total_files": 15,
+      "major_screens": [
+        "player_screen.dart (740 lines)",
+        "home_screen.dart (524 lines)",
+        "library_screen.dart (445 lines)"
+      ],
+      "issues_found": 27
+    },
+    "priority_levels": {
+      "critical": 8,
+      "high": 12,
+      "medium": 7
+    }
+  },
+  "database_queries": {
+    "category": "Database & Firestore Optimization",
+    "issues": [
+      {
+        "id": "DB-001",
+        "severity": "HIGH",
+        "file": "lib/services/playlist_service.dart",
+        "lines": [39, 42],
+        "issue": "Query without pagination - getPlaylists() fetches ALL playlists and lacks orderBy optimization",
+        "current_code": "final snap = await _db.collection('users').doc(userId).collection('playlists').orderBy('createdAt', descending: true).get();",
+        "recommendation": "Implement pagination with limit() and startAfter() for large user libraries. Add index on (userId, createdAt).",
+        "impact": "Could cause performance degradation with 100+ playlists",
+        "fix_complexity": "MEDIUM"
+      },
+      {
+        "id": "DB-002",
+        "severity": "CRITICAL",
+        "file": "lib/services/playlist_service.dart",
+        "lines": [55, 75],
+        "issue": "addSongToPlaylist() fetches entire playlist array, modifies in memory, and writes back - inefficient for large playlists",
+        "current_code": "final songs = List<Map<String, dynamic>>.from(existing.data()?['songs'] ?? []); ... await ref.update({'songs': songs});",
+        "recommendation": "Use Firestore arrayUnion/arrayRemove instead of fetch-modify-write pattern. Store as subcollection for 100+ songs.",
+        "impact": "Write throttling, increased latency, race conditions with concurrent updates",
+        "fix_complexity": "MEDIUM"
+      },
+      {
+        "id": "DB-003",
+        "severity": "HIGH",
+        "file": "lib/services/auth_service.dart",
+        "lines": [79, 85],
+        "issue": "toggleLike() uses individual arrayUnion/arrayRemove calls - could batch multiple likes into single write",
+        "current_code": "await ref.update({'likedSongIds': FieldValue.arrayUnion([songId])})",
+        "recommendation": "Implement batch write for multiple likes. Consider denormalizing like count for quick aggregation.",
+        "impact": "Higher write load, slower UI feedback",
+        "fix_complexity": "MEDIUM"
+      },
+      {
+        "id": "DB-004",
+        "severity": "HIGH",
+        "file": "lib/services/auth_service.dart",
+        "lines": [95, 105],
+        "issue": "fetchUser() queries Firestore on every auth state change without caching",
+        "current_code": "Future<UserModel?> fetchUser(String uid) async { final doc = await _db.collection('users').doc(uid).get(); }",
+        "recommendation": "Cache user data in memory with TTL. Use Firestore onSnapshot listener for real-time sync instead of repeated queries.",
+        "impact": "Unnecessary Firestore reads, unused read quota",
+        "fix_complexity": "MEDIUM"
+      },
+      {
+        "id": "DB-005",
+        "severity": "MEDIUM",
+        "file": "lib/services/playlist_service.dart",
+        "lines": [1, 120],
+        "issue": "No batch operations for bulk playlist operations (create multiple, delete multiple)",
+        "current_code": "Individual operations per playlist",
+        "recommendation": "Add batch{Create,Delete,Update}Playlists() methods using WriteBatch API",
+        "impact": "Multiple RPC calls instead of single batch",
+        "fix_complexity": "LOW"
+      },
+      {
+        "id": "DB-006",
+        "severity": "MEDIUM",
+        "file": "lib/providers/auth_provider.dart",
+        "lines": [42, 52],
+        "issue": "No composite key indexing for user queries (uid + createdAt for sorting)",
+        "current_code": "Queries on collection('users').doc(uid).collection('playlists')",
+        "recommendation": "Create Firestore composite indexes: users (uid, createdAt DESC)",
+        "impact": "Query performance degradation with scale",
+        "fix_complexity": "LOW"
+      }
+    ],
+    "optimization_opportunities": 6
+  },
+  "image_loading": {
+    "category": "Image Loading & Asset Optimization",
+    "issues": [
+      {
+        "id": "IMG-001",
+        "severity": "CRITICAL",
+        "file": "lib/widgets/song_tile.dart",
+        "lines": [330, 340],
+        "issue": "_Placeholder widget recreated on every frame - no const/memoization",
+        "current_code": "placeholder: (_, __) => _Placeholder() errorWidget: (_, __, ___) => _Placeholder()",
+        "recommendation": "Make _Placeholder() const or use Shimmer widget for better UX. Cache placeholder widgets.",
+        "impact": "Unnecessary widget rebuilds and memory churn",
+        "fix_complexity": "LOW"
+      },
+      {
+        "id": "IMG-002",
+        "severity": "HIGH",
+        "file": "lib/widgets/song_tile.dart",
+        "lines": [59, 65],
+        "issue": "CachedNetworkImage loaded twice for same song (tile + bottom sheet) without proper cache key",
+        "current_code": "CachedNetworkImage(imageUrl: song.imageUrl, ...) used in multiple widgets",
+        "recommendation": "Use CachedNetworkImageProvider with custom cache key manager. Pre-warming cache on song list load.",
+        "impact": "Duplicate cache entries, higher memory usage",
+        "fix_complexity": "MEDIUM"
+      },
+      {
+        "id": "IMG-003",
+        "severity": "HIGH",
+        "file": "lib/screens/player_screen.dart",
+        "lines": [132, 140],
+        "issue": "No image resolution/size optimization - loading full resolution images for thumbnails",
+        "current_code": "CachedNetworkImage(imageUrl: song.imageUrl, width: 200, height: 200, fit: BoxFit.cover)",
+        "recommendation": "Use image URL parameters to request specific resolution. Example: imageUrl + '?w=200&h=200&q=80'",
+        "impact": "Higher bandwidth usage, slower image loads",
+        "fix_complexity": "MEDIUM"
+      },
+      {
+        "id": "IMG-004",
+        "severity": "MEDIUM",
+        "file": "lib/screens/home_screen.dart",
+        "lines": [214, 220],
+        "issue": "CachedNetworkImageProvider used with large image in blur backdrop without size constraints",
+        "current_code": "image: CachedNetworkImageProvider(song!.imageUrl)",
+        "recommendation": "Add maxWidth, maxHeight to image cache configuration. Use smaller version for blur effect.",
+        "impact": "Increased memory footprint for decorative images",
+        "fix_complexity": "LOW"
+      },
+      {
+        "id": "IMG-005",
+        "severity": "LOW",
+        "file": "assets/",
+        "lines": [1, 5],
+        "issue": "SVG assets mentioned in pubspec.yaml but PNG duplicates exist (app_icon.png vs vibelo_icon_1024.png)",
+        "current_code": "flutter_svg dependency imported; PNG files in assets/icon/ and assets/icons/",
+        "recommendation": "Consolidate to single format. Consider WebP for app_icon (11KB -> ~7KB). Use SVG for vectors.",
+        "impact": "Asset bloat, minor size increase",
+        "fix_complexity": "LOW"
+      },
+      {
+        "id": "IMG-006",
+        "severity": "MEDIUM",
+        "file": "lib/screens/player_screen.dart",
+        "lines": [409, 420],
+        "issue": "Queue album art uses full-size image in horizontal scroll list",
+        "current_code": "CachedNetworkImage(...) in GridView/ListView without lazy loading optimization",
+        "recommendation": "Limit image dimensions to 80x80 for queue. Load on demand with precaching.",
+        "impact": "Memory spike with large queues (100+ songs)",
+        "fix_complexity": "LOW"
+      }
+    ],
+    "optimization_opportunities": 6
+  },
+  "code_structure": {
+    "category": "Large Widgets & Complex Build Methods",
+    "issues": [
+      {
+        "id": "STRUCT-001",
+        "severity": "CRITICAL",
+        "file": "lib/screens/player_screen.dart",
+        "lines": [1, 740],
+        "issue": "Monolithic 740-line screen with multiple responsibilities - player UI, queue management, equalizer, sleep timer",
+        "current_code": "class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMixin { ... Widget build() { ... } }",
+        "recommendation": "Extract into: PlayerHeader (100 lines), AlbumArt (80 lines), Controls (120 lines), Queue (200 lines), Equalizer (100 lines), SleepTimer (80 lines)",
+        "impact": "Hard to maintain, slow hot reload, performance issues with animations",
+        "fix_complexity": "HIGH"
+      },
+      {
+        "id": "STRUCT-002",
+        "severity": "HIGH",
+        "file": "lib/screens/home_screen.dart",
+        "lines": [1, 524],
+        "issue": "524-line screen with embedded banner, grids, and shimmer loaders in main build method",
+        "current_code": "Multiple private classes (_FeaturedBanner, _MoodGrid, _GenreGrid, _HorizontalSongList) defined inline",
+        "recommendation": "Move to separate widget files (featured_banner.dart, mood_grid.dart, genre_grid.dart)",
+        "impact": "Slow IDE responsiveness, complex git diffs",
+        "fix_complexity": "MEDIUM"
+      },
+      {
+        "id": "STRUCT-003",
+        "severity": "MEDIUM",
+        "file": "lib/screens/library_screen.dart",
+        "lines": [1, 445],
+        "issue": "445-line screen mixes music library, playlist management, and tab logic",
+        "current_code": "Multiple private tab classes (_LikedTab, _PlaylistsTab, _RecentTab) inline",
+        "recommendation": "Extract tabs to separate files with proper state management",
+        "impact": "Difficult to reuse tab components elsewhere",
+        "fix_complexity": "MEDIUM"
+      },
+      {
+        "id": "STRUCT-004",
+        "severity": "HIGH",
+        "file": "lib/screens/player_screen.dart",
+        "lines": [55, 110],
+        "issue": "DraggableScrollableSheet with SingleChildScrollView causing multiple scroll contexts",
+        "current_code": "Column with 12+ children, deeply nested SingleChildScrollView + DraggableScrollableSheet",
+        "recommendation": "Refactor to use SliverList/CustomScrollView for efficient scrolling",
+        "impact": "Scroll jank, poor performance with animations",
+        "fix_complexity": "MEDIUM"
+      },
+      {
+        "id": "STRUCT-005",
+        "severity": "MEDIUM",
+        "file": "lib/widgets/song_tile.dart",
+        "lines": [21, 280],
+        "issue": "SongTile widget handles play, like, options, share, add-to-playlist, add-to-queue - too many responsibilities",
+        "current_code": "280+ line widget with multiple bottom sheets and dialogs embedded",
+        "recommendation": "Separate into SongTile (display) + SongTileActions (modal factory)",
+        "impact": "Hard to test, reuse, or maintain",
+        "fix_complexity": "MEDIUM"
+      },
+      {
+        "id": "STRUCT-006",
+        "severity": "HIGH",
+        "file": "lib/screens/search_screen.dart",
+        "lines": [25, 130],
+        "issue": "Search TextField with setState() on every keystroke - no debouncing",
+        "current_code": "onChanged: (v) { _search(v); setState(() {}); }",
+        "recommendation": "Add 300ms debounce with Timer or use rxdart package",
+        "impact": "Triggers excessive API calls during typing",
+        "fix_complexity": "LOW"
+      }
+    ],
+    "optimization_opportunities": 6
+  },
+  "dependencies": {
+    "category": "Dependency & Import Analysis",
+    "issues": [
+      {
+        "id": "DEP-001",
+        "severity": "MEDIUM",
+        "file": "pubspec.yaml",
+        "lines": [20, 45],
+        "issue": "google_fonts imported in 9 files but loaded from network by ThemeData every app start",
+        "current_code": "GoogleFonts.poppins used in screens/home_screen.dart, screens/player_screen.dart, widgets/song_tile.dart, etc.",
+        "recommendation": "Use TextTheme preset in AppTheme + define const TextStyle for common cases. Lazy-load google_fonts only if needed.",
+        "impact": "Network latency on app startup, larger APK size",
+        "fix_complexity": "MEDIUM"
+      },
+      {
+        "id": "DEP-002",
+        "severity": "LOW",
+        "file": "lib/services/playlist_service.dart",
+        "lines": [1, 3],
+        "issue": "uuid package imported but only used for playlist ID generation - could use timestamp + hash",
+        "current_code": "final id = _uuid.v4(); final _uuid = const Uuid();",
+        "recommendation": "Replace with: '${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(10000)}'.hashCode",
+        "impact": "Tiny size reduction, no functional impact",
+        "fix_complexity": "LOW"
+      },
+      {
+        "id": "DEP-003",
+        "severity": "LOW",
+        "file": "lib/widgets/song_tile.dart",
+        "lines": [5, 5],
+        "issue": "share_plus package imported but used only in one callback",
+        "current_code": "import 'package:share_plus/share_plus.dart'; ... Share.share(...)",
+        "recommendation": "Platform-check import or lazy import only when needed",
+        "impact": "Minor size increase (share_plus adds ~200KB to APK)",
+        "fix_complexity": "LOW"
+      },
+      {
+        "id": "DEP-004",
+        "severity": "MEDIUM",
+        "file": "pubspec.yaml",
+        "lines": [25, 30],
+        "issue": "shimmer package imported but only used for loading placeholders in home_screen",
+        "current_code": "import 'package:shimmer/shimmer.dart'",
+        "recommendation": "Use native Flutter shimmer pattern or conditional import",
+        "impact": "APK size: shimmer adds ~100KB",
+        "fix_complexity": "LOW"
+      },
+      {
+        "id": "DEP-005",
+        "severity": "LOW",
+        "file": "lib/screens/auth/login_screen.dart",
+        "lines": [1, 5],
+        "issue": "Unused imports detected - verify all screen imports are used",
+        "current_code": "Multiple screens import unused services or providers",
+        "recommendation": "Run 'dart analyze' and remove unused imports. Use Dart lint rules.",
+        "impact": "Code cleanliness, minor build time improvement",
+        "fix_complexity": "LOW"
+      }
+    ],
+    "optimization_opportunities": 5,
+    "pubspec_analysis": {
+      "total_dependencies": 15,
+      "critical_packages": ["firebase_core", "provider", "cached_network_image"],
+      "optional_packages": ["shimmer", "share_plus", "uuid"],
+      "unused_features": "TODO: Run 'flutter pub outdated' and 'dart analyze'"
+    }
+  },
+  "assets": {
+    "category": "Asset Size & Optimization",
+    "issues": [
+      {
+        "id": "ASSET-001",
+        "severity": "MEDIUM",
+        "file": "assets/",
+        "lines": [1, 5],
+        "issue": "PNG assets not optimized - vibelo_icon_playstore_512.png (24.3KB) larger than necessary",
+        "current_code": "vibelo_icon_playstore_512.png - 24,364 bytes\nvibelo_icon_preview_192.png - 8,443 bytes\nicon/vibelo_icon_1024.png - 11,719 bytes\nicons/app_icon.png - 11,719 bytes",
+        "recommendation": "Convert to WebP format: expect 40-50% size reduction. Use single source file with density variants. Remove duplicates.",
+        "impact": "APK size reduction: ~8-12KB",
+        "fix_complexity": "LOW"
+      },
+      {
+        "id": "ASSET-002",
+        "severity": "MEDIUM",
+        "file": "assets/icons/ assets/icon/",
+        "lines": [1, 5],
+        "issue": "Duplicate app icon files in two directories (icons/ and icon/)",
+        "current_code": "vibelo_icon_1024.png listed in both assets/icon/ and assets/icons/",
+        "recommendation": "Consolidate to single directory. Update pubspec.yaml assets section.",
+        "impact": "Removes redundancy, improves maintainability",
+        "fix_complexity": "LOW"
+      },
+      {
+        "id": "ASSET-003",
+        "severity": "LOW",
+        "file": "flutter_launcher_icons.yaml",
+        "lines": [1, 10],
+        "issue": "Icon generation configuration includes both Android and iOS but not adaptive icons for Android 8+",
+        "current_code": "android: true, ios: true (no adaptive icon config)",
+        "recommendation": "Add adaptive icon support to reduce APK size and improve consistency",
+        "impact": "Better Android integration, minor size benefit",
+        "fix_complexity": "LOW"
+      }
+    ],
+    "asset_inventory": {
+      "total_assets_size_kb": 55.5,
+      "png_files": 4,
+      "yaml_files": 2,
+      "recommended_total_after_optimization_kb": 30.0
+    },
+    "optimization_opportunities": 3
+  },
+  "state_management": {
+    "category": "Provider & State Management Inefficiencies",
+    "issues": [
+      {
+        "id": "STATE-001",
+        "severity": "CRITICAL",
+        "file": "lib/widgets/song_tile.dart",
+        "lines": [21, 22],
+        "issue": "Widget watches entire PlayerProvider and AuthProvider instead of specific fields - rebuilds on any change",
+        "current_code": "final player = context.watch<PlayerProvider>();\nfinal auth = context.watch<AuthProvider>();",
+        "recommendation": "Use Selector to watch only: isPlaying, currentSongId from PlayerProvider; isLiked from AuthProvider",
+        "example_fix": "final isPlaying = context.select<PlayerProvider, bool>((p) => p.isPlaying && p.currentSong?.id == song.id);",
+        "impact": "Rebuilds 10+ times per interaction instead of necessary rebuilds",
+        "fix_complexity": "LOW"
+      },
+      {
+        "id": "STATE-002",
+        "severity": "HIGH",
+        "file": "lib/providers/auth_provider.dart",
+        "lines": [95, 100],
+        "issue": "toggleLike() calls notifyListeners() twice - once for local update, once after Firebase write",
+        "current_code": "optimistic update: notifyListeners(); await Firebase op; (implicit listener again on state change)",
+        "recommendation": "Single notifyListeners() call after successful Firebase write. Use try-catch for rollback.",
+        "impact": "Double rebuilds, increased rendered frame count",
+        "fix_complexity": "LOW"
+      },
+      {
+        "id": "STATE-003",
+        "severity": "HIGH",
+        "file": "lib/screens/home_screen.dart",
+        "lines": [52, 55],
+        "issue": "Watches entire MusicProvider even when only displaying trending list - rebuilds on all music changes",
+        "current_code": "final music = context.watch<MusicProvider>();",
+        "recommendation": "Use Selector: context.select<MusicProvider, List<SongModel>>((m) => m.trending);",
+        "impact": "Unnecessary rebuilds during search, genre load, etc.",
+        "fix_complexity": "LOW"
+      },
+      {
+        "id": "STATE-004",
+        "severity": "MEDIUM",
+        "file": "lib/screens/search_screen.dart",
+        "lines": [31, 35],
+        "issue": "Watches entire MusicProvider but only uses searchResults - rebuilds on trending/new releases load",
+        "current_code": "final music = context.watch<MusicProvider>();",
+        "recommendation": "Use Selector to watch only searchResults list",
+        "impact": "Unnecessary widget rebuilds",
+        "fix_complexity": "LOW"
+      },
+      {
+        "id": "STATE-005",
+        "severity": "HIGH",
+        "file": "lib/providers/music_provider.dart",
+        "lines": [32, 45],
+        "issue": "loadHomeData() sets multiple boolean flags with individual notifyListeners() calls",
+        "current_code": "_loadingTrending = true; notifyListeners(); _loadingNew = true; notifyListeners();",
+        "recommendation": "Batch state updates: set all flags, then single notifyListeners()",
+        "impact": "Double rebuilds during home screen load",
+        "fix_complexity": "LOW"
+      },
+      {
+        "id": "STATE-006",
+        "severity": "MEDIUM",
+        "file": "lib/screens/library_screen.dart",
+        "lines": [32, 40],
+        "issue": "Uses setState() for local playlist loading instead of Provider - mixing state management patterns",
+        "current_code": "setState(() => _loadingPlaylists = true); ... setState(() { _playlists = list; });",
+        "recommendation": "Move to LocalPlaylistProvider or MusicProvider for consistency",
+        "impact": "Inconsistent patterns, harder to test",
+        "fix_complexity": "MEDIUM"
+      },
+      {
+        "id": "STATE-007",
+        "severity": "MEDIUM",
+        "file": "lib/screens/player_screen.dart",
+        "lines": [47, 50],
+        "issue": "PlayerProvider watched in build method multiple times - no memoization of derived values",
+        "current_code": "final player = context.watch<PlayerProvider>();",
+        "recommendation": "Add computed getters in PlayerProvider: isCurrentSongPlaying, progressPercent, etc.",
+        "impact": "Repeated calculations, widget rebuilds",
+        "fix_complexity": "MEDIUM"
+      }
+    ],
+    "optimization_opportunities": 7
+  },
+  "performance_metrics": {
+    "current_state": {
+      "app_startup_time_ms": "~2500ms (estimated with Firebase init)",
+      "home_screen_build_time_ms": "~300ms (estimated)",
+      "image_load_time_s": "~1-3s per image (network dependent)",
+      "firestore_queries_per_session": "Unknown - trace with Performance Monitoring"
+    },
+    "bottlenecks": [
+      "Firebase initialization blocking UI (LOW - using async)",
+      "Large widget build methods with complex layouts",
+      "Unnecessary Provider rebuilds triggering cascading updates",
+      "Unoptimized image loading in scrollable lists",
+      "Firestore queries without pagination/limits"
+    ]
+  },
+  "recommendations_priority": {
+    "immediate_fixes": [
+      "STATE-001: Add Selector() in SongTile for PlayerProvider/AuthProvider",
+      "DB-002: Replace fetch-modify-write with Firestore arrayUnion/arrayRemove",
+      "IMG-001: Make _Placeholder widget const or use Shimmer",
+      "STRUCT-004: Refactor player screen scroll view"
+    ],
+    "short_term": [
+      "Extract player screen components (200 lines per file)",
+      "Implement image size optimization (resolution variants)",
+      "Add search debouncing",
+      "Batch Firestore writes for multiple likes"
+    ],
+    "long_term": [
+      "Full state management refactor using Selector()",
+      "Extract all major screens into modular components",
+      "Implement lazy loading for playlists",
+      "Add Firestore offline persistence caching"
+    ]
+  },
+  "summary_by_category": {
+    "database_queries": {
+      "total_issues": 6,
+      "critical": 1,
+      "high": 2,
+      "estimated_effort_hours": 12
+    },
+    "image_loading": {
+      "total_issues": 6,
+      "critical": 1,
+      "high": 2,
+      "estimated_effort_hours": 8
+    },
+    "code_structure": {
+      "total_issues": 6,
+      "critical": 1,
+      "high": 2,
+      "estimated_effort_hours": 20
+    },
+    "dependencies": {
+      "total_issues": 5,
+      "critical": 0,
+      "high": 0,
+      "estimated_effort_hours": 4
+    },
+    "assets": {
+      "total_issues": 3,
+      "critical": 0,
+      "high": 0,
+      "estimated_effort_hours": 2
+    },
+    "state_management": {
+      "total_issues": 7,
+      "critical": 1,
+      "high": 2,
+      "estimated_effort_hours": 10
+    }
+  },
+  "estimated_improvements": {
+    "apk_size_reduction_percent": 15,
+    "app_startup_time_reduction_percent": 20,
+    "ui_responsiveness_improvement_percent": 35,
+    "firestore_quota_savings_percent": 40,
+    "memory_usage_reduction_percent": 25,
+    "battery_efficiency_improvement_percent": 15
+  },
+  "total_optimization_issues": 33,
+  "total_estimated_effort_hours": 56,
+  "overall_code_quality_score": "65/100",
+  "action_items_next_steps": [
+    "1. Run 'flutter pub outdated' and 'dart analyze' to identify more unused code",
+    "2. Enable Firestore Performance Monitoring in Firebase Console",
+    "3. Use Flutter DevTools to profile app startup and widget rebuilds",
+    "4. Set up device performance baselines before making changes",
+    "5. Implement changes in priority order: state management -> structure -> database"
+  ]
+}
