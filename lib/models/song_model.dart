@@ -12,6 +12,7 @@ class SongModel {
   final bool isPremium;
   bool isLiked;
   bool isDownloaded;
+  final Map<String, dynamic>? audioQualities;
 
   SongModel({
     required this.id,
@@ -27,6 +28,7 @@ class SongModel {
     this.isPremium = false,
     this.isLiked = false,
     this.isDownloaded = false,
+    this.audioQualities,
   });
 
   String get durationString {
@@ -44,9 +46,8 @@ class SongModel {
       audioUrl: json['audio'] ?? '',
       imageUrl: json['album_image'] ?? json['image'] ?? '',
       duration: int.tryParse(json['duration']?.toString() ?? '0') ?? 0,
-      genre: (json['musicinfo']?['tags']?['genres'] as List?)
-              ?.join(', ') ??
-          '',
+      genre: (json['musicinfo']?['tags']?['genres'] as List?)?.join(', ') ?? '',
+      audioQualities: json['audioQualities'] as Map<String, dynamic>?,
     );
   }
 
@@ -69,6 +70,7 @@ class SongModel {
       duration: int.tryParse(json['duration']?.toString() ?? '0') ?? 0,
       source: 'JioSaavn',
       sourceUrl: json['url'] ?? '',
+      audioQualities: json['audioQualities'] as Map<String, dynamic>?,
     );
   }
 
@@ -86,6 +88,7 @@ class SongModel {
       sourceUrl: map['sourceUrl'] ?? '',
       isPremium: map['isPremium'] ?? false,
       isLiked: map['isLiked'] ?? false,
+      audioQualities: map['audioQualities'] as Map<String, dynamic>?,
     );
   }
 
@@ -103,10 +106,11 @@ class SongModel {
       'sourceUrl': sourceUrl,
       'isPremium': isPremium,
       'isLiked': isLiked,
+      if (audioQualities != null) 'audioQualities': audioQualities,
     };
   }
 
-  SongModel copyWith({bool? isLiked, bool? isDownloaded}) {
+  SongModel copyWith({bool? isLiked, bool? isDownloaded, Map<String, dynamic>? audioQualities}) {
     return SongModel(
       id: id,
       title: title,
@@ -121,6 +125,7 @@ class SongModel {
       isPremium: isPremium,
       isLiked: isLiked ?? this.isLiked,
       isDownloaded: isDownloaded ?? this.isDownloaded,
+      audioQualities: audioQualities ?? this.audioQualities,
     );
   }
 }

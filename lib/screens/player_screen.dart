@@ -338,10 +338,10 @@ class _PlayerScreenState extends State<PlayerScreen>
                           icon: Icons.share_outlined,
                           label: 'Share',
                           onTap: () {
-                            final isYouTube = song.audioUrl.startsWith('youtube');
+                            final isYouTube = (song.audioUrl ?? '').startsWith('youtube');
                             final shareText = isYouTube
-                                ? '🎵 Listen to "${song.title}" by ${song.artist} on Vibelo!\nhttps://youtu.be/${song.audioUrl.split("://").last}'
-                                : '🎵 Listen to "${song.title}" by ${song.artist} on Vibelo!\n${song.audioUrl}';
+                                ? '🎵 Listen to "${song.title}" by ${song.artist} on Vibelo!\nhttps://youtu.be/${(song.audioUrl ?? '').split("://").last}'
+                                : '🎵 Listen to "${song.title}" by ${song.artist} on Vibelo!\n${song.audioUrl ?? ''}';
                             Share.share(shareText, subject: 'Check out this song');
                           },
                         ),
@@ -353,13 +353,13 @@ class _PlayerScreenState extends State<PlayerScreen>
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
-                        color: (song.audioUrl.startsWith('youtube')
+                        color: ((song.audioUrl ?? '').startsWith('youtube')
                                 ? Colors.red
                                 : VColors.secondary)
                             .withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: (song.audioUrl.startsWith('youtube')
+                          color: ((song.audioUrl ?? '').startsWith('youtube')
                                   ? Colors.red
                                   : VColors.secondary)
                               .withValues(alpha: 0.3),
@@ -369,22 +369,22 @@ class _PlayerScreenState extends State<PlayerScreen>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            song.audioUrl.startsWith('youtube')
+                            (song.audioUrl ?? '').startsWith('youtube')
                                 ? Icons.smart_display_rounded
                                 : Icons.verified_rounded,
-                            color: song.audioUrl.startsWith('youtube')
+                            color: (song.audioUrl ?? '').startsWith('youtube')
                                 ? Colors.red
                                 : VColors.secondary,
                             size: 16,
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            song.audioUrl.startsWith('youtube')
+                            (song.audioUrl ?? '').startsWith('youtube')
                                 ? 'Audio via YouTube'
                                 : 'Royalty-Free Music via Jamendo',
                             style: GoogleFonts.poppins(
                               fontSize: 11,
-                              color: song.audioUrl.startsWith('youtube')
+                              color: (song.audioUrl ?? '').startsWith('youtube')
                                   ? Colors.red.shade300
                                   : VColors.secondary,
                             ),

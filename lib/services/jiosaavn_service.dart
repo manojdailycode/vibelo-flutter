@@ -27,7 +27,7 @@ class JioSaavnService {
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         final results = data['data']?['results'] as List? ?? [];
-        return results.map((e) => SongModel.fromJioSaavn(e as Map<String, dynamic>)).toList();
+        return results.map((e) => SongModel.fromMap(e as Map<String, dynamic>)).toList();
       }
     } catch (e) {
       // Silently catch exceptions and return an empty list
