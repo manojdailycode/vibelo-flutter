@@ -21,5 +21,12 @@ class MusicGenres {
     {'tag': 'party', 'name': 'Party', 'emoji': '🎉'},
   ];
 
-  static const List<Map<String, String>> moodTiles = moods;
+  static const List<Map<String, dynamic>> moodTiles = [
+    {'label': 'Happy', 'color': 0xFFFFB74D, 'emoji': '😊', 'tag': 'happy'},
+    {'label': 'Chill', 'color': 0xFF81C784, 'emoji': '😌', 'tag': 'chill'},
+    {'label': 'Energy', 'color': 0xFFFF7043, 'emoji': '⚡', 'tag': 'energy'},
+    {'label': 'Sad', 'color': 0xFF64B5F6, 'emoji': '😢', 'tag': 'sad'},
+    {'label': 'Romance', 'color': 0xFFEC407A, 'emoji': '💕', 'tag': 'romance'},
+    {'label': 'Party', 'color': 0xFF9575CD, 'emoji': '🎉', 'tag': 'party'},
+  ];
 }

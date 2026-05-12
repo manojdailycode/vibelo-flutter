@@ -143,11 +143,13 @@ class YouTubeService {
   }
 
   // ── Static helpers (used by player) ──────────────────────────────────────
-  static bool isYouTubeUrl(String audioUrl) => 
-      audioUrl.startsWith('youtube://') || audioUrl.startsWith('youtube:');
+  static bool isYouTubeUrl(String? audioUrl) {
+    if (audioUrl == null || audioUrl.isEmpty) return false;
+    return audioUrl.startsWith('youtube://') || audioUrl.startsWith('youtube:');
+  }
 
-  static String? extractVideoId(String audioUrl) {
+  static String? extractVideoId(String? audioUrl) {
     if (!isYouTubeUrl(audioUrl)) return null;
-    return audioUrl.replaceFirst(RegExp(r'^youtube:\/\/|^youtube:'), '');
+    return audioUrl!.replaceFirst(RegExp(r'^youtube:\/\/|^youtube:'), '');
   }
 }

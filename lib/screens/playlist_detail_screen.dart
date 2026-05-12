@@ -112,7 +112,7 @@ class PlaylistDetailScreen extends StatelessWidget {
                     // Play All Button
                     ElevatedButton.icon(
                       onPressed: () {
-                        final playableSongs = songs.where((s) => !YouTubeService.isYouTubeUrl(s.audioUrl)).toList();
+                        final playableSongs = songs.where((s) => s.audioUrl != null && s.audioUrl!.isNotEmpty && !YouTubeService.isYouTubeUrl(s.audioUrl)).toList();
                         if (playableSongs.isNotEmpty) {
                           context.read<PlayerProvider>().playSong(playableSongs.first, queue: playableSongs);
                           showModalBottomSheet(

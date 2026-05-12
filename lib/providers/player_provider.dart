@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:http/http.dart' as http;
 import '../services/audio_handler.dart';
 import '../models/song_model.dart';
 import '../services/youtube_service.dart';
@@ -138,15 +139,21 @@ class PlayerProvider extends ChangeNotifier {
         }
 
         // Some YouTube CDN URLs return 403 on specific devices/networks.
-        // Try multiple audio-only variants from high->low bitrate.
+        // Try all available audio-only variants from low->high bitrate.
         final sorted = audioStreams.toList()
-          ..sort((a, b) => b.bitrate.bitsPerSecond.compareTo(a.bitrate.bitsPerSecond));
+          ..sort((a, b) => a.bitrate.bitsPerSecond.compareTo(b.bitrate.bitsPerSecond));
 
         Object? lastError;
         bool started = false;
 
-        for (final stream in sorted.take(6)) {
+        for (final stream in sorted) {
           final candidateUrl = stream.url.toString();
+
+          if (!await _isUrlPlayable(candidateUrl)) {
+            debugPrint('PlayerProvider: skipping blocked candidate → $candidateUrl');
+            continue;
+          }
+
           try {
             final item = MediaItem(
               id:       candidateUrl,
@@ -248,6 +255,22 @@ class PlayerProvider extends ChangeNotifier {
     if (_duration.inSeconds > 0) {
       await _handler
           .seek(Duration(seconds: (progress * _duration.inSeconds).round()));
+    }
+  }
+
+  Future<bool> _isUrlPlayable(String url) async {
+    try {
+      final res = await http.head(
+        Uri.parse(url),
+        headers: {
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                  '(KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
+        },
+      ).timeout(const Duration(seconds: 10));
+      return res.statusCode != 403;
+    } catch (_) {
+      return true;
     }
   }
 

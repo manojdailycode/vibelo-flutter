@@ -696,33 +696,39 @@ class _EqualizerSheetState extends State<_EqualizerSheet> {
           const SizedBox(height: 20),
           SizedBox(
             height: 160,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: List.generate(10, (i) {
-                return Column(
-                  children: [
-                    Text('${_values[i].toInt()}',
-                        style: GoogleFonts.poppins(
-                            fontSize: 9, color: VColors.textSec)),
-                    Expanded(
-                      child: RotatedBox(
-                        quarterTurns: 3,
-                        child: Slider(
-                          value: _values[i],
-                          min: -10,
-                          max: 10,
-                          onChanged: (v) => setState(() => _values[i] = v),
-                          activeColor: VColors.primary,
-                          inactiveColor: VColors.divider,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: List.generate(10, (i) {
+                  return SizedBox(
+                    width: 60,
+                    child: Column(
+                      children: [
+                        Text('${_values[i].toInt()}',
+                            style: GoogleFonts.poppins(
+                                fontSize: 9, color: VColors.textSec)),
+                        Expanded(
+                          child: RotatedBox(
+                            quarterTurns: 3,
+                            child: Slider(
+                              value: _values[i],
+                              min: -10,
+                              max: 10,
+                              onChanged: (v) => setState(() => _values[i] = v),
+                              activeColor: VColors.primary,
+                              inactiveColor: VColors.divider,
+                            ),
+                          ),
                         ),
-                      ),
+                        Text(_bands[i],
+                            style: GoogleFonts.poppins(
+                                fontSize: 8, color: VColors.textMuted)),
+                      ],
                     ),
-                    Text(_bands[i],
-                        style: GoogleFonts.poppins(
-                            fontSize: 8, color: VColors.textMuted)),
-                  ],
-                );
-              }),
+                  );
+                }),
+              ),
             ),
           ),
           const SizedBox(height: 16),

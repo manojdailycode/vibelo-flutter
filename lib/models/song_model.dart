@@ -3,7 +3,7 @@ class SongModel {
   final String title;
   final String artist;
   final String album;
-  final String audioUrl;
+  final String? audioUrl;
   final String imageUrl;
   final int duration; // seconds
   final String genre;
@@ -52,21 +52,50 @@ class SongModel {
   }
 
   factory SongModel.fromJioSaavn(Map<String, dynamic> json) {
-    // Helper to get the highest quality URL from a list of links
-    String getBestUrl(dynamic urls) {
-      if (urls is List && urls.isNotEmpty) {
-        return (urls.last['link'] ?? '').toString();
+    // Helper to safely extract a URL from various types
+    String readUrl(dynamic value) {
+      if (value is String && value.isNotEmpty) return value;
+      if (value is List && value.isNotEmpty) {
+        if (value.first is Map) {
+          return (value.last['link'] ?? '').toString();
+        }
+        if (value.first is String) return value.last.toString();
       }
-      return (urls is String) ? urls : '';
+      if (value is Map) {
+        return (value['link'] ?? '').toString();
+      }
+      return '';
+    }
+
+    String readArtist(dynamic value) {
+      if (value is String && value.isNotEmpty) return value;
+      if (value is List && value.isNotEmpty) {
+        if (value.first is Map) {
+          return (value.first['name'] ?? '').toString();
+        }
+        if (value.first is String) return value.first.toString();
+      }
+      if (value is Map) {
+        return (value['name'] ?? '').toString();
+      }
+      return 'Unknown Artist';
+    }
+
+    String readAlbum(dynamic value) {
+      if (value is String && value.isNotEmpty) return value;
+      if (value is Map) {
+        return (value['name'] ?? '').toString();
+      }
+      return 'Unknown Album';
     }
 
     return SongModel(
       id: 'jiosaavn_${json['id'] ?? ''}',
       title: json['name'] ?? json['title'] ?? 'Unknown Title',
-      artist: json['primaryArtists'] ?? 'Unknown Artist',
-      album: json['album']?['name'] ?? 'Unknown Album',
-      audioUrl: getBestUrl(json['downloadUrl']),
-      imageUrl: getBestUrl(json['image']),
+      artist: readArtist(json['primaryArtists']),
+      album: readAlbum(json['album']),
+      audioUrl: readUrl(json['downloadUrl']),
+      imageUrl: readUrl(json['image']),
       duration: int.tryParse(json['duration']?.toString() ?? '0') ?? 0,
       source: 'JioSaavn',
       sourceUrl: json['url'] ?? '',
@@ -80,7 +109,7 @@ class SongModel {
       title: map['title'] ?? 'Unknown Title',
       artist: map['artist'] ?? 'Unknown Artist',
       album: map['album'] ?? '',
-      audioUrl: map['audioUrl'] ?? '',
+      audioUrl: map['audioUrl'] as String?,
       imageUrl: map['imageUrl'] ?? '',
       duration: map['duration'] ?? 0,
       source: map['source'] ?? '',
@@ -90,6 +119,10 @@ class SongModel {
       isLiked: map['isLiked'] ?? false,
       audioQualities: map['audioQualities'] as Map<String, dynamic>?,
     );
+  }
+
+  factory SongModel.fromJson(Map<String, dynamic> json) {
+    return SongModel.fromMap(json);
   }
 
   Map<String, dynamic> toMap() {

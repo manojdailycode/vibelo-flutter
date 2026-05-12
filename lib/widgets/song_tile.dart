@@ -18,7 +18,7 @@ class SongTile extends StatelessWidget {
 
   const SongTile({super.key, required this.song, required this.songs});
 
-  bool get _isYouTube => YouTubeService.isYouTubeUrl(song.audioUrl);
+  bool get _isYouTube => song.audioUrl != null && YouTubeService.isYouTubeUrl(song.audioUrl);
 
   @override
   Widget build(BuildContext context) {
@@ -271,10 +271,10 @@ class SongTile extends StatelessWidget {
                   style: GoogleFonts.poppins(color: VColors.textPri)),
               onTap: () {
                 Navigator.pop(context);
-                final shareText = _isYouTube
+                final shareText = _isYouTube && song.audioUrl != null
                     ? '🎵 Watch "${song.title}" by ${song.artist} on YouTube!\n'
                       'https://youtu.be/${YouTubeService.extractVideoId(song.audioUrl)}'
-                    : '🎵 Listen to "${song.title}" by ${song.artist} on Vibelo!\n${song.audioUrl}';
+                    : '🎵 Listen to "${song.title}" by ${song.artist} on Vibelo!\n${song.audioUrl ?? 'No URL available'}';
                 Share.share(shareText, subject: 'Check out this song');
               },
             ),

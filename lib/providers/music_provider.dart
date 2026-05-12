@@ -19,6 +19,7 @@ class MusicProvider extends ChangeNotifier {
   bool _loadingGenre      = false;
   String? _searchQuery;
   String? _searchError;
+  String? _jioLastError;
   Timer? _debounce;
 
   List<SongModel> get trending      => _trending;
@@ -32,25 +33,31 @@ class MusicProvider extends ChangeNotifier {
   bool get loadingGenre    => _loadingGenre;
   String? get searchQuery  => _searchQuery;
   String? get searchError  => _searchError;
+  String? get jioLastError => _jioLastError;
 
   // ── Load home data — pulls from ALL sources via MusicSourceManager ───────
   Future<void> loadHomeData() async {
+    debugPrint('[MusicProvider] Loading home data...');
     _loadingTrending = true;
     _loadingNew = true;
     notifyListeners();
 
     try {
+      debugPrint('[MusicProvider] Fetching trending and new releases from MusicSourceManager...');
       final home = await _manager.loadHomeData();
       _trending   = home.trending;
       _newRelease = home.newReleases;
+      debugPrint('[MusicProvider] ✓ Loaded: ${_trending.length} trending, ${_newRelease.length} new releases');
     } catch (e) {
-      debugPrint('MusicSourceManager.loadHomeData failed, falling back: $e');
+      debugPrint('[MusicProvider] ✗ MusicSourceManager failed, falling back to JioSaavn: $e');
+      
       final results = await Future.wait([
         _jiosaavn.searchSongs('trending songs india', limit: 20),
         _jiosaavn.searchSongs('new releases', limit: 20),
       ]);
       _trending   = results[0];
       _newRelease = results[1];
+      debugPrint('[MusicProvider] Fallback: ${_trending.length} trending, ${_newRelease.length} new releases');
     }
 
     _loadingTrending = false;
@@ -76,22 +83,44 @@ class MusicProvider extends ChangeNotifier {
   Future<void> _performSearch(String query) async {
     _searchQuery = query;
     _searchError = null;
+    _jioLastError = null;
     _loadingSearch = true;
     notifyListeners();
+    debugPrint('[MusicProvider.Search] Starting search for: "$query"');
 
     try {
+      debugPrint('[MusicProvider.Search] Calling MusicSourceManager.searchAll...');
       final results = await _manager.searchAll(query, limitPerType: 30);
       _searchResults = results.songs;
+      debugPrint('[MusicProvider.Search] ✓ Got ${_searchResults.length} songs from MusicSourceManager');
+      
+      // Capture error info from JioSaavn for debugging
+      if (_jiosaavn.lastError != null) {
+        _jioLastError = '${_jiosaavn.lastError}: ${_jiosaavn.lastErrorMessage}';
+        debugPrint('[MusicProvider.Search] JioSaavn had error (but fallback succeeded): $_jioLastError');
+      }
     } catch (e) {
-      debugPrint('MusicSourceManager.search failed, falling back: $e');
+      debugPrint('[MusicProvider.Search] ✗ MusicSourceManager failed: $e');
+      debugPrint('[MusicProvider.Search] Trying direct JioSaavn search...');
+      
       _searchResults = await _jiosaavn.searchSongs(query, limit: 30);
+      debugPrint('[MusicProvider.Search] JioSaavn direct: ${_searchResults.length} songs');
+      
       if (_searchResults.isEmpty) {
-        _searchError = 'Unable to search right now. Please check your connection.';
+        if (_jiosaavn.lastError != null) {
+          _searchError = 'JioSaavn error (${_jiosaavn.lastError}). Unable to search right now.';
+          _jioLastError = '${_jiosaavn.lastError}: ${_jiosaavn.lastErrorMessage}';
+          debugPrint('[MusicProvider.Search] ✗ No results and error: $_searchError');
+        } else {
+          _searchError = 'Unable to search right now. Please check your connection.';
+          debugPrint('[MusicProvider.Search] ✗ No results from JioSaavn');
+        }
       }
     }
 
     _loadingSearch = false;
     notifyListeners();
+    debugPrint('[MusicProvider.Search] Search complete. Total results: ${_searchResults.length}');
   }
 
   void clearSearch() {
@@ -99,6 +128,7 @@ class MusicProvider extends ChangeNotifier {
     _debounce?.cancel();
     _searchQuery = null;
     _searchError = null;
+    _jioLastError = null;
     notifyListeners();
   }
 
